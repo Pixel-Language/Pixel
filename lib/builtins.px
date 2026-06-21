@@ -1,0 +1,79 @@
+#bind "builtins.h"
+
+fn print_int(x: Int) -> Void {
+    ext {
+        print_int(px_x);
+    }
+}
+
+fn print_float(x: Float) -> Void {
+    ext {
+        print_float(px_x);
+    }
+}
+
+fn print_string(s: String) -> Void {
+    ext {
+        print_string(px_s);
+    }
+}
+
+fn print_bool(b: Bool) -> Void {
+    ext {
+        print_bool(px_b);
+    }
+}
+
+fn print_pointer(p: Void*) -> Void {
+    ext {
+        print_pointer(px_p);
+    }
+}
+
+fn abs(x: Int) -> Int {
+    ext {
+        return abs(px_x);
+    }
+}
+
+fn max(a: Int, b: Int) -> Int {
+    ext {
+        return _max(px_a, px_b);
+    }
+}
+
+fn min(a: Int, b: Int) -> Int {
+    ext {
+        return _min(px_a, px_b);
+    }
+}
+
+fn input_string() -> String {
+    ext {
+        return input_string();
+    }
+}
+
+fn malloc(size: Int) -> Void* {
+    ext {
+        return c_malloc(px_size);
+    }
+}
+
+fn free(ptr: Void*) -> Void {
+    ext {
+        c_free(px_ptr);
+    }
+}
+
+fn memset(ptr: Void*, value: Int, size: Int) -> Void {
+    ext {
+        c_memset(px_ptr, px_value, px_size);
+    }
+}
+
+fn memcpy(dest: Void*, src: Void*, size: Int) -> Void {
+    ext {
+        c_memcpy(px_dest, px_src, px_size);
+    }
+}
