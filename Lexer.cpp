@@ -161,8 +161,34 @@ std::vector<Token> Lexer::tokenize() {
             case '}': tokens.push_back({ TokenType::Rbrace,       "}"  }); break;
             case '[': tokens.push_back({ TokenType::Lbracket,     "["  }); break;
             case ']': tokens.push_back({ TokenType::Rbracket,     "]"  }); break;
-            case '<': tokens.push_back({ TokenType::LessThan,     "<"  }); break;
-            case '>': tokens.push_back({ TokenType::GreaterThan,  ">"  }); break;
+
+            case '>':
+                if (index + 1 < src.length() && src[index + 1] == '=') {
+                    tokens.push_back({ TokenType::GreaterThanEqualTo, ">=" });
+                    advance(); // consume '='
+                } else {
+                    tokens.push_back({ TokenType::GreaterThan, ">" });
+                }
+                break;
+            
+            case '<':
+                if (index + 1 < src.length() && src[index + 1] == '=') {
+                    tokens.push_back({ TokenType::LessThanEqualTo, "<=" });
+                    advance(); // consume '='
+                } else {
+                    tokens.push_back({ TokenType::LessThan, "<" });
+                }
+                break;
+
+            case '!':
+                if (index + 1 < src.length() && src[index + 1] == '=') {
+                    tokens.push_back({ TokenType::NotEquals, "!=" });
+                    advance(); // consume '='
+                } else {
+                    tokens.push_back({ TokenType::ExclamationMark, "!" });
+                }
+                break;
+            
             case ',': tokens.push_back({ TokenType::Comma,        ","  }); break;
             case ':': tokens.push_back({ TokenType::Colon,        ":"  }); break;
 

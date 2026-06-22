@@ -663,6 +663,9 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         current_token().type == TokenType::Div         ||
         current_token().type == TokenType::GreaterThan ||
         current_token().type == TokenType::LessThan    ||
+        current_token().type == TokenType::LessThanEqualTo    ||
+        current_token().type == TokenType::GreaterThanEqualTo    ||
+        current_token().type == TokenType::NotEquals    ||
         current_token().type == TokenType::DoubleEquals)
     {
         auto bin_op = std::make_unique<BinOpNode>();

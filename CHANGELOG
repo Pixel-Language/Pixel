@@ -1,5 +1,7 @@
 
-Version CURRENT:
+Version 0.2.0:
     made the dereference require bracket (so i can have expressinos and not just normal vars)and made dereferences use an astnode and not a string
     added a way to debug tokens
     fixed this big error with function defenition parsing
+    added unless keyword
+    added <=, >=, and !=

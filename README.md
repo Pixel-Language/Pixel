@@ -182,6 +182,15 @@ if (condition) {
 }
 ```
 
+## Unless statement
+this means if not
+
+```
+unless (condition) {
+    // then block
+}
+```
+
 ### Examples
 ```
 if (age >= 18) {

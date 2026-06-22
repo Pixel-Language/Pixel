@@ -22,13 +22,17 @@ enum class TokenType {
 
     // Operators
     Equals,
+    NotEquals, //do this
+    ExclamationMark,
     DoubleEquals,
     Plus,
     Minus,
     Mult,
     Div,
     LessThan,
+    LessThanEqualTo, //do this
     GreaterThan,
+    GreaterThanEqualTo, //do this
 
     // Punctuation
     Lparen,
