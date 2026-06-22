@@ -44,6 +44,7 @@ enum class TokenType {
 
     // Keywords
     If,
+    Unless,
     While,
     Return,
     FuncDefine,

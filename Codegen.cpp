@@ -336,9 +336,24 @@ std::string Codegen::generate_node(ASTNode* node) {
     }
 
     if (auto if_node = dynamic_cast<IfNode*>(node)) {
-        std::string c_if = "    if (" + generate_node(if_node->condition.get()) + ") {\n";
+        std::string c_if = "    if (" ;
+        
+        if (if_node->is_unless == true) {
+            c_if += "!(";
+        }
+
+        c_if += generate_node(if_node->condition.get());
+
+        if (if_node->is_unless == true) {
+            c_if += ")";
+        }
+
+        c_if += + ") {\n";
+
         for (const auto& stmt : if_node->then_block) c_if += generate_node(stmt.get());
+
         c_if += "    }\n";
+
         return c_if;
     }
 

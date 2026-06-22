@@ -259,10 +259,16 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         return while_node;
     }
 
-    // if (<condition>) { ... }
-    if (current_token().type == TokenType::If) {
-        advance(); // consume 'if'
+    // if (<condition>) { ... } and unless
+    if (current_token().type == TokenType::If || current_token().type == TokenType::Unless) {
+        TokenType t = current_token().type;
+
+        advance(); // consume 'if' or 'unless'
         auto if_node = std::make_unique<IfNode>();
+
+        if (t == TokenType::Unless) {
+            if_node->is_unless = true;
+        }
 
         expect(TokenType::Lparen);
         if_node->condition = parse_expression();
