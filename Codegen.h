@@ -1,40 +1,42 @@
-#pragma once
+#ifndef CODEGEN_H
+#define CODEGEN_H
+
+#include "AST.h"
+#include <string>
 #include <vector>
 #include <memory>
-#include <string>
 #include <unordered_map>
-#include <unordered_set>
-#include "AST.h"
-#include "Token.h"
+#include <set>
 
 class Codegen {
 public:
-    // Main generation entry point
+    Codegen() = default;
+    
+    void set_source_dir(const std::string& dir) { source_dir = dir; }
+    void set_stdlib_path(const std::string& path) { stdlib_path = path; }
+    
     std::string generate_c_code(const std::vector<std::unique_ptr<ASTNode>>& ast);
-
-    void set_source_dir(const std::string& dir) { 
-        source_dir = dir; 
-    }
+    std::string generate_node(ASTNode* node);
     
-    void set_stdlib_path(const std::string& path) { 
-        stdlib_path = path; 
-    }
-
+    // Type inference helpers
+    std::string infer_type(ASTNode* node);
+    std::string type_info_to_c_string(const TypeInfo& info);
+    
 private:
-	std::unordered_set<std::string> current_function_params;
-
-    std::string source_dir = "";
-    std::string stdlib_path = ""; 
+    std::string source_dir = ".";
+    std::string stdlib_path = "lib/";
     
-    std::vector<std::string> includes;
     std::string struct_definitions;
     std::string function_definitions;
+    std::vector<std::string> includes;
+    
     std::unordered_map<std::string, std::string> variable_types;
-
-    // Formatting helper functions
+    std::unordered_map<std::string, std::string> function_return_types;
+    std::set<std::string> current_function_params;
+    
+    // Helper functions
     std::string c_type_from_value(const std::string& value);
     std::string printf_format_for(const std::string& expr);
-    
-    // Node generation worker
-    std::string generate_node(ASTNode* node);
 };
+
+#endif

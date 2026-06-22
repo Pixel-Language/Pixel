@@ -3,4 +3,5 @@ pixel-vscode-extension
 *.exe
 *.vsix
 test_doc.px
+output.c
 

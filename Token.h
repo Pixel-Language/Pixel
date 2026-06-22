@@ -17,7 +17,8 @@ enum class TokenType {
     FloatKeyword,
     VoidKeyword,
     ArrayKeyword,
-    SmartKeyword,
+    AutoKeyword,
+    NullPtr,
 
     // Operators
     Equals,

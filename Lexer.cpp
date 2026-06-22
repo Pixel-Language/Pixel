@@ -64,7 +64,8 @@ Token Lexer::parse_identifier() {
     if (result == "Bool")   return { TokenType::BoolKeyword,   result };
     if (result == "Void")   return { TokenType::VoidKeyword,   result };
     if (result == "Array")  return { TokenType::ArrayKeyword,  result };
-    if (result == "Smart")  return { TokenType::SmartKeyword,  result };
+    if (result == "Auto")  return { TokenType::AutoKeyword,  result };
+    if (result == "nullptr")   return { TokenType::NullPtr,    result };
     if (result == "true")   return { TokenType::True,          result };
     if (result == "false")  return { TokenType::False,         result };
     if (result == "return") return { TokenType::Return,        result };

@@ -4,85 +4,120 @@
 #include <cstdlib>
 #include <algorithm>
 #include <string>
+#include <cstdio>  // for std::remove
+#include <filesystem> // for path manipulations 'n stuff
 #include "Lexer.h"
 #include "Parser.h"
 #include "Codegen.h"
 
-// Detect OS at compile time
+// Detect OS at compile time (i havent tested this thing on linux yet, oh well)
 #ifdef _WIN32
     #define PLATFORM_WINDOWS 1
 #else
     #define PLATFORM_LINUX 1
 #endif
 
-// um well i havent tested this thing on linux yet, oh well. (it probably wont work)
+namespace fs = std::filesystem;
 
 int main(int argc, char* argv[]) {
-	if (argc < 2) {
-		std::cerr << "usage: pixel <source_file>\n";
-		return 1;
-	}
+    // Parse command line arguments
+    std::string source_file;
+    bool keep_c_file = false;
 
-	std::string filename = argv[1];
-	std::string source_code;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--keep-c-file") {
+            keep_c_file = true;
+        } else if (source_file.empty()) {
+            source_file = arg;
+        }
+    }
 
-	std::ifstream in_file(filename);
-	if (!in_file.is_open()) {
-		std::cerr << "error: could not open file '" << filename << "'\n";
-		return 1;
-	}
+    if (source_file.empty()) {
+        std::cerr << "usage: pixel <source_file> [--keep-c-file]\n";
+        return 1;
+    }
 
-	std::stringstream buffer;
-	buffer << in_file.rdbuf();
-	source_code = buffer.str();
-	in_file.close();
+    // Read source code
+    std::ifstream in_file(source_file);
+    if (!in_file.is_open()) {
+        std::cerr << "error: could not open file '" << source_file << "'\n";
+        return 1;
+    }
+    std::stringstream buffer;
+    buffer << in_file.rdbuf();
+    std::string source_code = buffer.str();
+    in_file.close();
 
-	size_t last_slash = filename.find_last_of("\\/");
-    std::string source_dir = (last_slash == std::string::npos) ? "." : filename.substr(0, last_slash);
+    // Determine source directory for includes
+    size_t last_slash = source_file.find_last_of("\\/");
+    std::string source_dir = (last_slash == std::string::npos) ? "." : source_file.substr(0, last_slash);
 
-	std::cout << "pixel: compiling " << filename << "...\n";
+    std::cout << "pixel: compiling " << source_file << "...\n";
 
-	Lexer lexer(source_code);
-	std::vector<Token> tokens = lexer.tokenize();
-	std::cout << "lexer tokenized\n";
+    // Lexical analysis
+    Lexer lexer(source_code);
+    std::vector<Token> tokens = lexer.tokenize();
+    std::cout << "lexer tokenized\n";
 
-	Parser parser(std::move(tokens));
-	parser.set_source_dir(source_dir);
-	std::vector<std::unique_ptr<ASTNode>> ast = parser.parse_program();
+    // Parsing
+    Parser parser(std::move(tokens));
+    parser.set_source_dir(source_dir);
+    std::vector<std::unique_ptr<ASTNode>> ast = parser.parse_program();
 
-	Codegen codegen;
-	codegen.set_source_dir(source_dir);
-	codegen.set_stdlib_path("lib/");
-	std::string c_code = codegen.generate_c_code(ast);
+    // Code generation
+    Codegen codegen;
+    codegen.set_source_dir(source_dir);
+    codegen.set_stdlib_path("lib/");
+    std::string c_code = codegen.generate_c_code(ast);
 
-	std::ofstream out_file("output.c");
-	out_file << c_code;
-	out_file.close();
+    // Write C file
+    const std::string c_filename = "output.c";
+    std::ofstream out_file(c_filename);
+    out_file << c_code;
+    out_file.close();
 
-	std::cout << "\n\n" << c_code << "\n\n";
-	std::cout << "pixel: generated output.c\n";
+    std::cout << "\n\n" << c_code << "\n\n";
+    std::cout << "pixel: generated " << c_filename << "\n";
 
-	std::string compile_cmd;
-	std::string exe_name;
+    // Build executable name from input file stem
+    fs::path src_path(source_file);
+    std::string exe_stem = src_path.stem().string();   // main from main.pixel
 
-	#ifdef PLATFORM_WINDOWS
-		compile_cmd = "g++ -std=c++17 -I\"lib\" output.c -L\"lib\" -lraylib -lopengl32 -lgdi32 -lwinmm -o pixel_program.exe";
-		exe_name = "pixel_program.exe";
-	#else
-		compile_cmd = "g++ -std=c++17 -I./lib output.c -L./lib -lraylib -lGL -lm -o pixel_program";
-		exe_name = "./pixel_program";
-	#endif
+    std::string compile_cmd;
+    std::string run_cmd;
 
-	int compile_result = std::system(compile_cmd.c_str());
+#ifdef PLATFORM_WINDOWS
+    std::string exe_name = exe_stem + ".exe";
+    compile_cmd = "g++ -std=c++17 -I\"lib\" " + c_filename +
+                  " -L\"lib\" -lraylib -lopengl32 -lgdi32 -lwinmm -o " + exe_name;
+    run_cmd = exe_name;
+#else
+    std::string exe_name = exe_stem;
+    compile_cmd = "g++ -std=c++17 -I./lib " + c_filename +
+                  " -L./lib -lraylib -lGL -lm -o " + exe_name;
+    run_cmd = "./" + exe_name;
+#endif
 
-	if (compile_result == 0) {
-		std::cout << "pixel: execution output\n";
-		std::system(exe_name.c_str());
-		std::cout << "\n";
-	}
-	else {
-		std::cerr << "pixel: error: gcc failed to compile\n";
-	}
+    // Compile
+    int compile_result = std::system(compile_cmd.c_str());
 
-	return 0;
+    if (compile_result == 0) {
+        std::cout << "pixel: execution output\n";
+        std::system(run_cmd.c_str());
+        std::cout << "\n";
+    } else {
+        std::cerr << "pixel: error: g++ failed to compile\n";
+    }
+
+    // Delete the intermediate C file unless --keep-c-file was given
+    if (!keep_c_file) {
+        if (std::remove(c_filename.c_str()) != 0) {
+            std::cerr << "pixel: warning: could not delete " << c_filename << "\n";
+        } else {
+            std::cout << "pixel: removed " << c_filename << "\n";
+        }
+    }
+
+    return 0;
 }

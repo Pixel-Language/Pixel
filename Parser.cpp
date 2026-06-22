@@ -40,7 +40,7 @@ bool Parser::is_type_keyword(TokenType t) const {
            t == TokenType::FloatKeyword  ||
            t == TokenType::VoidKeyword   ||
            t == TokenType::ArrayKeyword  ||
-           t == TokenType::SmartKeyword;
+           t == TokenType::AutoKeyword;
 }
 
 // lib loading
@@ -494,6 +494,11 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
     else if (current_token().type == TokenType::False) {
         auto lit = std::make_unique<LiteralNode>();
         lit->value = "false";
+        advance();
+        left = std::move(lit);
+    } else if (current_token().type == TokenType::NullPtr) {
+        auto lit = std::make_unique<LiteralNode>();
+        lit->value = "nullptr";
         advance();
         left = std::move(lit);
     } else if (current_token().type == TokenType::At) {

@@ -2,6 +2,8 @@
 #include <cctype>
 #include <iostream>
 
+// helpers
+
 std::string Codegen::c_type_from_value(const std::string& value) {
     if (value == "true" || value == "false") return "bool";
     if (!value.empty() && value.front() == '"') return "string";
@@ -22,7 +24,100 @@ std::string Codegen::printf_format_for(const std::string& expr) {
     return "%d";
 }
 
+// type inference
+
+std::string Codegen::type_info_to_c_string(const TypeInfo& info) {
+    if (!info.struct_name.empty()) {
+        return "struct px_" + info.struct_name + (info.is_pointer ? "*" : "");
+    }
+    std::string base;
+    switch (info.base_type) {
+        case TokenType::IntKeyword:    base = "int"; break;
+        case TokenType::FloatKeyword:  base = "double"; break;
+        case TokenType::BoolKeyword:   base = "bool"; break;
+        case TokenType::StringKeyword: base = "const char*"; break;
+        case TokenType::VoidKeyword:   base = "void"; break;
+        default:                       base = "int"; break;
+    }
+    if (info.is_pointer) base += "*";
+    if (info.is_array)   base += "[]";
+    return base;
+}
+
+std::string Codegen::infer_type(ASTNode* node) {
+    if (!node) return "int";
+
+    // literal or identifier
+    if (auto lit = dynamic_cast<LiteralNode*>(node)) {
+        std::string val = lit->value;
+        if (!val.empty() && val.front() == '"') return "const char*";
+        if (val == "true" || val == "false") return "bool";
+        if (val.find('.') != std::string::npos) return "double";
+        if (!val.empty() && (std::isdigit(val[0]) || val[0] == '-')) return "int";
+        
+        // variable lookup
+        auto it = variable_types.find(val);
+        if (it != variable_types.end()) return it->second;
+        return "int";
+    }
+
+    // function call
+    if (auto call = dynamic_cast<FunctionCallNode*>(node)) {
+        auto it = function_return_types.find(call->name);
+        if (it != function_return_types.end()) return it->second;
+        return "int";
+    }
+
+    // binary op
+    if (auto bin = dynamic_cast<BinOpNode*>(node)) {
+        std::string left_type = infer_type(bin->left.get());
+        std::string right_type = infer_type(bin->right.get());
+        if (left_type == "double" || right_type == "double") return "double";
+        return "int";
+    }
+
+    // dereference
+    if (auto deref = dynamic_cast<DereferenceNode*>(node)) {
+        auto it = variable_types.find(deref->target);
+        if (it != variable_types.end()) {
+            std::string type = it->second;
+            if (!type.empty() && type.back() == '*') type.pop_back();
+            return type;
+        }
+        return "int";
+    }
+
+    // array literal
+    if (auto arr = dynamic_cast<ArrayLiteralNode*>(node)) {
+        if (!arr->elements.empty()) {
+            std::string elem_type = infer_type(arr->elements[0].get());
+            return "std::vector<" + elem_type + ">";
+        }
+        return "std::vector<int>";
+    }
+
+    // array index access
+    if (auto idx = dynamic_cast<IndexAccessNode*>(node)) {
+        auto it = variable_types.find(idx->target);
+        if (it != variable_types.end()) {
+            std::string type = it->second;
+            if (type.find("std::vector<") == 0 && type.back() == '>') {
+                size_t start = 12;
+                size_t end = type.size() - 1;
+                return type.substr(start, end - start);
+            }
+            if (type.find("[]") != std::string::npos) {
+                return type.substr(0, type.find("[]"));
+            }
+        }
+        return "int";
+    }
+
+    return "int";
+}
+
 // 100% pure Pixel generation. No external flags!
+
 std::string Codegen::generate_node(ASTNode* node) {
     if (!node) return "";
     if (auto ext_block = dynamic_cast<ExtBlockNode*>(node)) {
@@ -51,7 +146,6 @@ std::string Codegen::generate_node(ASTNode* node) {
 
     if (auto deref_node = dynamic_cast<DereferenceNode*>(node)) {
         std::string target = deref_node->target;
-
         return "*px_" + target;
     }
 
@@ -73,24 +167,12 @@ std::string Codegen::generate_node(ASTNode* node) {
 
         std::string final_id = "px_" + assign->identifier;
 
-        if (assign->is_declaration && assign->type_info.base_type == TokenType::SmartKeyword) {
-            // Infer type from RHS
-            std::string inferred_c_type = "int";  // default
-            
-            if (auto lit = dynamic_cast<LiteralNode*>(assign->expression.get())) {
-                if (!lit->value.empty() && lit->value.front() == '"') {
-                    inferred_c_type = "const char*";
-                } else if (lit->value.find('.') != std::string::npos) {
-                    inferred_c_type = "double";
-                } else if (lit->value == "true" || lit->value == "false") {
-                    inferred_c_type = "bool";
-                } else {
-                    std::cerr << "error: can't infer type";
-                }
-            }
-            
-            std::string value = generate_node(assign->expression.get());
-            return "    " + inferred_c_type + " px_" + assign->identifier + " = " + value + ";\n";
+        // auto keyword inference
+        if (assign->is_declaration && assign->type_info.base_type == TokenType::AutoKeyword) {
+            std::string inferred_c_type = infer_type(assign->expression.get());
+            variable_types[assign->identifier] = inferred_c_type;
+            std::string rhs = generate_node(assign->expression.get());
+            return "    " + inferred_c_type + " " + final_id + " = " + rhs + ";\n";
         }
 
         if (assign->is_declaration) {
@@ -102,9 +184,9 @@ std::string Codegen::generate_node(ASTNode* node) {
 
             // If its an array tag the tracker type string with []
             if (assign->type_info.is_array) {
-                variable_types[final_id] = type + "[]";
+                variable_types[assign->identifier] = type + "[]";
             } else {
-                variable_types[final_id] = type;
+                variable_types[assign->identifier] = type;
             }
 
             std::string c_type;
@@ -123,7 +205,7 @@ std::string Codegen::generate_node(ASTNode* node) {
                 c_type += "*";
             }
 
-            // array brakcet
+            // array bracket
             if (assign->initialized) {
                 if (assign->type_info.is_array) {
                     return "    " + c_type + " " + final_id + "[] = " + value + ";\n";
@@ -174,11 +256,15 @@ std::string Codegen::generate_node(ASTNode* node) {
     // literals and identifiers
     if (auto lit = dynamic_cast<LiteralNode*>(node)) {
         if (!lit->value.empty() && (std::isalpha(lit->value[0]) || lit->value[0] == '_')) {
-            if (lit->value != "true" && lit->value != "false") {
+            if (lit->value != "true" && lit->value != "false" && lit->value != "nullptr") {
                 if (current_function_params.find(lit->value) != current_function_params.end()) {
                     return lit->value;  // Raw parameter name
                 }
                 return "px_" + lit->value;
+            }
+            
+            if (lit->value == "nullptr") {
+                return "(void*)0";
             }
         }
         return lit->value;
@@ -213,23 +299,8 @@ std::string Codegen::generate_node(ASTNode* node) {
         
         std::string func_c_code = "";
 
-        std::string c_return_type;
-        const TypeInfo& rti = func_decl->return_type;
-
-        if (!rti.struct_name.empty()) {
-            c_return_type = "struct px_" + rti.struct_name;
-        } else {
-            switch (rti.base_type) {
-                case TokenType::StringKeyword: c_return_type = "const char*"; break;
-                case TokenType::BoolKeyword:   c_return_type = "bool";        break;
-                case TokenType::FloatKeyword:  c_return_type = "double";      break;
-                case TokenType::VoidKeyword:   c_return_type = "void";        break;
-                default:                        c_return_type = "int";         break;
-            }
-        }
-
-        if (rti.is_array)   c_return_type += "*";
-        if (rti.is_pointer) c_return_type += "*";
+        std::string c_return_type = type_info_to_c_string(func_decl->return_type);
+        function_return_types[func_decl->name] = c_return_type;
 
         func_c_code += c_return_type + " px_" + func_decl->name + "(";
 
@@ -238,21 +309,14 @@ std::string Codegen::generate_node(ASTNode* node) {
             const TypeInfo& ti = param.type_info;
 
             std::string param_c_type;
-
-            if (!ti.struct_name.empty()) {
-                param_c_type = "struct px_" + ti.struct_name;
+            if (ti.is_array) {
+                // Arrays decay to pointers in function parameters
+                TypeInfo base_info = ti;
+                base_info.is_array = false;  // remove array flag
+                param_c_type = type_info_to_c_string(base_info) + "*";
             } else {
-                switch (ti.base_type) {
-                    case TokenType::StringKeyword: param_c_type = "const char*"; break;
-                    case TokenType::BoolKeyword:   param_c_type = "bool";        break;
-                    case TokenType::FloatKeyword:  param_c_type = "double";      break;
-                    case TokenType::VoidKeyword:  param_c_type = "void";      break;
-                    default:                        param_c_type = "int";         break;
-                }
+                param_c_type = type_info_to_c_string(ti);
             }
-
-            if (ti.is_array)   param_c_type += "*";   // arrays decay to pointer in C params
-            if (ti.is_pointer) param_c_type += "*";
 
             func_c_code += param_c_type + " px_" + param.name;
             if (i < func_decl->parameters.size() - 1) func_c_code += ", ";

@@ -364,6 +364,8 @@ let result = sqrt(16.0)  // 4.0
 pixel source.px
 ```
 
+--keep-c-file is an Optional flag. If provided, the intermediate C file (output.c) is not deleted after compilation; otherwise it is removed automatically.
+
 ### Output
 Generates an executable
 
