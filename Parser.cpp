@@ -7,6 +7,8 @@
 
 // constructor and token helpers
 
+// rm pixel.exe; g++ -std=c++17 -O3 -s main.cpp Lexer.cpp Parser.cpp Codegen.cpp -o pixel.exe; .\pixel.exe "test_doc.px" --keep-c-file
+
 // TODO: use this function (maybe)
 Token Parser::peek(size_t offset) {
     if (pos + offset >= tokens.size()) return { TokenType::EndOfFile, "" };

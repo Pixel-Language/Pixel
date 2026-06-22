@@ -4,4 +4,5 @@ pixel-vscode-extension
 *.vsix
 test_doc.px
 output.c
-
+pixel_release
+pixel-release.zip
