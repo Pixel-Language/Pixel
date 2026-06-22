@@ -90,8 +90,8 @@ struct FunctionDeclNode : public ASTNode {
 };
 
 struct DereferenceNode : public ASTNode {
-    // std::unique_ptr<LiteralNode> target;
-    std::string target;
+    std::unique_ptr<ASTNode> target;
+    // std::string target;
 };
 
 struct StructDeclNode : public ASTNode {

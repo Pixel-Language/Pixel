@@ -31,6 +31,8 @@ private:
     void  expect(TokenType type);     // advance if match, print error otherwise
     bool  is_type_keyword(TokenType t) const;
 
+    std::string token_type_to_string(TokenType type);
+
     // Searches for a file in: source_dir/ then source_dir/lib/
     // Returns the full path, or "" if not found
     std::string find_library(const std::string& name);

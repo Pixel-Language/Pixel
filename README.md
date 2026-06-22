@@ -74,7 +74,7 @@ Int age = 25
 Float price = 99.99
 Bool is_active = true
 String greeting = "Hello"
-Int* ptr = null
+Int* ptr = nullptr
 Array(Int) numbers = [1, 2, 3, 4, 5]
 ```
 

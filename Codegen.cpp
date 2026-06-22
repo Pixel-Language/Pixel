@@ -78,7 +78,7 @@ std::string Codegen::infer_type(ASTNode* node) {
 
     // dereference
     if (auto deref = dynamic_cast<DereferenceNode*>(node)) {
-        auto it = variable_types.find(deref->target);
+        auto it = variable_types.find(generate_node(deref->target.get()));
         if (it != variable_types.end()) {
             std::string type = it->second;
             if (!type.empty() && type.back() == '*') type.pop_back();
@@ -145,8 +145,8 @@ std::string Codegen::generate_node(ASTNode* node) {
     }
 
     if (auto deref_node = dynamic_cast<DereferenceNode*>(node)) {
-        std::string target = deref_node->target;
-        return "*px_" + target;
+        std::string thing = generate_node(deref_node->target.get());
+        return "*(" + thing + ")";
     }
 
     // i can frickin' read

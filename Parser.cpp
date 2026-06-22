@@ -24,12 +24,62 @@ void Parser::advance() {
     if (pos < tokens.size()) pos++;
 }
 
+std::string Parser::token_type_to_string(TokenType type) {
+    switch(type) {
+        case TokenType::Ext: return "Ext";
+        case TokenType::Lbrace: return "Lbrace";
+        case TokenType::Rbrace: return "Rbrace";
+        case TokenType::RawExtCode: return "RawExtCode";
+        case TokenType::Identifier: return "Identifier";
+        case TokenType::IntKeyword: return "IntKeyword";
+        case TokenType::StringKeyword: return "StringKeyword";
+        case TokenType::BoolKeyword: return "BoolKeyword";
+        case TokenType::FloatKeyword: return "FloatKeyword";
+        case TokenType::VoidKeyword: return "VoidKeyword";
+        case TokenType::ArrayKeyword: return "ArrayKeyword";
+        case TokenType::AutoKeyword: return "AutoKeyword";
+        case TokenType::FuncDefine: return "FuncDefine";
+        case TokenType::Return: return "Return";
+        case TokenType::If: return "If";
+        case TokenType::While: return "While";
+        case TokenType::Struct: return "Struct";
+        case TokenType::Number: return "Number";
+        case TokenType::Float: return "Float";
+        case TokenType::String: return "String";
+        case TokenType::True: return "True";
+        case TokenType::False: return "False";
+        case TokenType::At: return "At";
+        case TokenType::EndOfFile: return "EOF";
+        case TokenType::Rarrow: return "Rarrow";
+        case TokenType::Equals: return "Equals";
+        case TokenType::DoubleEquals: return "DoubleEquals";
+        case TokenType::Plus: return "Plus";
+        case TokenType::Minus: return "Minus";
+        case TokenType::Mult: return "Mult";
+        case TokenType::Div: return "Div";
+        case TokenType::Lparen: return "Lparen";
+        case TokenType::Rparen: return "Rparen";
+        case TokenType::Lbracket: return "Lbracket";
+        case TokenType::Rbracket: return "Rbracket";
+        case TokenType::LessThan: return "LessThan";
+        case TokenType::GreaterThan: return "GreaterThan";
+        case TokenType::Comma: return "Comma";
+        case TokenType::Colon: return "Colon";
+        case TokenType::Bind: return "Bind";
+        case TokenType::Use: return "Use";
+        case TokenType::NullPtr: return "NullPtr";
+        default: return "Unknown";
+    }
+}
+
+
 void Parser::expect(TokenType type) {
     if (current_token().type == type) {
         advance();
     } else {
         std::cerr << "parser error: expected different token, got '"
                   << current_token().value << "'\n";
+        exit(1);
     }
 }
 
@@ -87,6 +137,15 @@ void Parser::load_and_parse_file(const std::string& path,
 // parse_program entry point thing
 
 std::vector<std::unique_ptr<ASTNode>> Parser::parse_program() {
+    // std::cout << "Total tokens: " << tokens.size() << "\n";
+    
+    // // Dump all tokens first
+    // for (size_t i = 0; i < tokens.size(); i++) {
+    //     std::cout << "Token " << i << ": " << token_type_to_string(tokens[i].type) 
+    //               << " Value: '" << tokens[i].value << "'\n";
+    // }
+    // std::cout << "end of token dump\n\n";
+
     std::vector<std::unique_ptr<ASTNode>> program;
 
     // Auto-import builtins.px from the lib/ folder (if it hasn't been loaded yet)
@@ -392,7 +451,7 @@ std::unique_ptr<ASTNode> Parser::parse_function_definition() {
 
     TypeInfo return_type_info = parse_type();
     func_decl->return_type = return_type_info;
-    advance(); // consume return type
+    // advance(); // consume return type
 
     expect(TokenType::Lbrace);
     while (current_token().type != TokenType::Rbrace &&
@@ -504,9 +563,10 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
     } else if (current_token().type == TokenType::At) {
         auto lit = std::make_unique<DereferenceNode>();
         advance(); //consume '@'
-        if (current_token().type == TokenType::Identifier) {
-            lit->target = current_token().value;
-            advance(); //consume target
+        if (current_token().type == TokenType::Lparen) {
+            advance(); //conssume lparen
+            lit->target = parse_expression();
+            expect(TokenType::Rparen);
         } else {
             exit(1);
         }
