@@ -69,6 +69,8 @@ std::string Parser::token_type_to_string(TokenType type) {
         case TokenType::Colon: return "Colon";
         case TokenType::Bind: return "Bind";
         case TokenType::Use: return "Use";
+        case TokenType::And: return "And";
+        case TokenType::Or: return "Or";
         case TokenType::NullPtr: return "NullPtr";
         default: return "Unknown";
     }
@@ -552,7 +554,12 @@ std::vector<Parameter> Parser::parse_parameters() {
 std::unique_ptr<ASTNode> Parser::parse_expression() {
     std::unique_ptr<ASTNode> left;
 
-    if (current_token().type == TokenType::True) {
+    if (current_token().type == TokenType::Lparen) {
+        advance(); // consume lparen
+        auto exp = parse_expression();
+        left = std::move(exp);
+        expect(TokenType::Rparen);
+    } else if (current_token().type == TokenType::True) {
         auto lit = std::make_unique<LiteralNode>();
         lit->value = "true";
         advance();
@@ -667,11 +674,20 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         current_token().type == TokenType::LessThan    ||
         current_token().type == TokenType::LessThanEqualTo    ||
         current_token().type == TokenType::GreaterThanEqualTo    ||
-        current_token().type == TokenType::NotEquals    ||
+        current_token().type == TokenType::NotEquals   ||
+        current_token().type == TokenType::And         ||
+        current_token().type == TokenType::Or          ||
         current_token().type == TokenType::DoubleEquals)
     {
         auto bin_op = std::make_unique<BinOpNode>();
         bin_op->op    = current_token().value;
+
+        if (current_token().type == TokenType::And) {
+            bin_op->op = "&&";
+        } else if (current_token().type == TokenType::Or) {
+            bin_op->op = "||";
+        }
+
         bin_op->left  = std::move(left);
         advance(); // consume operator
         bin_op->right = parse_expression(); // right side parsed recursively

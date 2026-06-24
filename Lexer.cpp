@@ -72,6 +72,8 @@ Token Lexer::parse_identifier() {
     if (result == "fn")     return { TokenType::FuncDefine,    result };
     if (result == "if")     return { TokenType::If,            result };
     if (result == "unless") return { TokenType::Unless,        result };
+    if (result == "and")    return { TokenType::And,           result };
+    if (result == "or")     return { TokenType::Or,           result };
     if (result == "while")  return { TokenType::While,        result };
     if (result == "ext")    return { TokenType::Ext,           result };
     if (result == "struct") return { TokenType::Struct,        result };

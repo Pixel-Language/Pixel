@@ -5,3 +5,7 @@ Version 0.2.0:
     fixed this big error with function defenition parsing
     added unless keyword
     added <=, >=, and !=
+
+Version 0.3.0:
+    added 'not' and 'and' keywords
+    added bracket support to parse_expression

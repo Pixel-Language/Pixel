@@ -48,6 +48,8 @@ enum class TokenType {
 
     // Keywords
     If,
+    And,
+    Or,
     Unless,
     While,
     Return,
