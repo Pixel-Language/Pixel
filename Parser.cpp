@@ -17,6 +17,25 @@ Token Parser::peek(size_t offset) {
 
 Parser::Parser(std::vector<Token> token_list) : tokens(token_list), pos(0) {}
 
+void Parser::error(const std::string& msg) {
+    error_count++;
+    Token tok = current_token();
+    std::cerr << tok.location.filename 
+              << ":" << tok.location.line 
+              << ":" << tok.location.column 
+              << " error: " << msg << "\n";
+    // we want to try to continue
+}
+
+void Parser::fatal_error(const std::string& msg) {
+    Token tok = current_token();
+    std::cerr << tok.location.filename 
+              << ":" << tok.location.line 
+              << ":" << tok.location.column 
+              << " fatal: " << msg << "\n";
+    exit(1);
+}
+
 Token Parser::current_token() {
     if (pos >= tokens.size()) return { TokenType::EndOfFile, "" };
     return tokens[pos];
@@ -76,14 +95,16 @@ std::string Parser::token_type_to_string(TokenType type) {
     }
 }
 
-
+// expect will consume the expected token, or report error and skip it
 void Parser::expect(TokenType type) {
     if (current_token().type == type) {
         advance();
     } else {
-        std::cerr << "parser error: expected different token, got '"
-                  << current_token().value << "'\n";
-        exit(1);
+        error("expected " + token_type_to_string(type) + 
+              ", got '" + current_token().value + "'");
+        // instead of advancing, let's let the caller handle recovery
+        // but to avoid infinite loops, we'll skip the bad token
+        advance();
     }
 }
 
@@ -115,14 +136,13 @@ void Parser::load_and_parse_file(const std::string& path,
                                  std::vector<std::unique_ptr<ASTNode>>& out) {
     std::ifstream file(path);
     if (!file.is_open()) {
-        std::cerr << "parser error: could not open '" << path << "'\n";
-        exit(1);
+        fatal_error("could not open file '" + path + "'");
     }
 
     std::stringstream buffer;
     buffer << file.rdbuf();
 
-    Lexer lexer(buffer.str());
+    Lexer lexer(buffer.str(), path); // pass filename for location tracking
     std::vector<Token> tokens = lexer.tokenize();
 
     // Give the sub-parser the directory of the file being imported
@@ -166,16 +186,17 @@ std::vector<std::unique_ptr<ASTNode>> Parser::parse_program() {
             advance(); // consume 'use'
 
             if (current_token().type != TokenType::String) {
-                std::cerr << "parser error: #use expects a file path string\n";
-                exit(1);
+                error("#use expects a file path string");
+                advance(); // skip the bad token
+                continue;
             }
             std::string lib_name = current_token().value;
             advance(); // consume the path string
 
             std::string full_path = find_library(lib_name);
             if (full_path.empty()) {
-                std::cerr << "parser error: could not find '" << lib_name << "'\n";
-                exit(1);
+                error("could not find '" + lib_name + "'");
+                continue;
             }
 
             // Guard against circular imports (A uses B, B uses A)
@@ -186,8 +207,24 @@ std::vector<std::unique_ptr<ASTNode>> Parser::parse_program() {
             continue;
         }
 
-        if (auto stmt = parse_statement())
+        if (auto stmt = parse_statement()) {
             program.push_back(std::move(stmt));
+        } else {
+            // If parse_statement returns nullptr then we had an error
+            // lets try to recover by skipping to the next thing
+            while (current_token().type != TokenType::EndOfFile &&
+                   current_token().type != TokenType::Rbrace) { // i'd put a semicolon here if i actually USED them
+                // Let's just skip to the next statement start
+                if (current_token().type == TokenType::Return ||
+                    current_token().type == TokenType::If ||
+                    current_token().type == TokenType::While ||
+                    current_token().type == TokenType::FuncDefine ||
+                    current_token().type == TokenType::Struct) {
+                    break;
+                }
+                advance();
+            }
+        }
     }
 
     return program;
@@ -200,12 +237,19 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
     // ext { <raw C code> }
     if (current_token().type == TokenType::Ext) {
         advance(); // consume 'ext'
-        expect(TokenType::Lbrace);
+        if (current_token().type != TokenType::Lbrace) {
+            error("expected '{' after 'ext'");
+            return nullptr;  // return nullptr to signal error
+        }
+
+        expect(TokenType::Lbrace); // this will consume '{' or skip on error
 
         auto ext_block = std::make_unique<ExtBlockNode>();
         if (current_token().type == TokenType::RawExtCode) {
             ext_block->raw_c_code = current_token().value;
             advance();
+        } else {
+            error("expected raw C code inside ext block");
         }
 
         expect(TokenType::Rbrace);
@@ -217,8 +261,8 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         advance(); // consume 'bind'
 
         if (current_token().type != TokenType::String) {
-            std::cerr << "parser error: #bind expects a file path string\n";
-            exit(1);
+            error("#bind expects a file path string");
+            return nullptr;
         }
         auto bind_node = std::make_unique<BindNode>();
         bind_node->filepath = current_token().value;
@@ -329,8 +373,8 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
             advance(); // consume '->'
 
             if (current_token().type != TokenType::Identifier) {
-                std::cerr << "parser error: expected field name after '->'\n";
-                exit(1);
+                error("expected field name after '->'");
+                return nullptr;
             }
             std::string field = current_token().value;
             advance(); // consume field name
@@ -348,8 +392,13 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         expect(TokenType::Equals);
 
         if (declared_vars.find(name) == declared_vars.end()) {
-            std::cerr << "parser error: '" << name << "' used before declaration\n";
-            exit(1);
+            error("variable '" + name + "' used before declaration");
+            // create an assign node anyway to consume the expression
+            auto assign = std::make_unique<AssignNode>();
+            assign->identifier = name;
+            assign->is_declaration = false;
+            assign->expression = parse_expression();
+            return assign;
         }
 
         auto assign = std::make_unique<AssignNode>();
@@ -374,8 +423,14 @@ TypeInfo Parser::parse_type() {
         expect(TokenType::Lparen);
 
         if (!is_type_keyword(current_token().type)) {
-            std::cerr << "parser error: expected element type inside Array(...)\n";
-            exit(1);
+            error("expected element type inside Array(...)");
+            // return a default type
+            info.base_type = TokenType::IntKeyword;
+            info.is_array = true;
+            // skip the bad token
+            advance();
+            expect(TokenType::Rparen);
+            return info;
         }
         info.base_type = current_token().type;
         info.is_array  = true;
@@ -399,20 +454,20 @@ TypeInfo Parser::parse_type() {
         advance(); // consume struct name
     }
     else {
-        std::cerr << "parser error: expected a type, got '" << current_token().value << "'\n";
-        exit(1);
+        error("expected a type, got '" + current_token().value + "'");
+        // return a default type and skip the bad token
+        info.base_type = TokenType::IntKeyword;
+        advance();
     }
 
     return info;
 }
 
-
-
 std::unique_ptr<ASTNode> Parser::parse_declaration(TypeInfo type_info) {
     // Variable name
     if (current_token().type != TokenType::Identifier) {
-        std::cerr << "parser error: expected variable name after type\n";
-        exit(1);
+        error("expected variable name after type");
+        return nullptr;
     }
 
     auto assign = std::make_unique<AssignNode>();
@@ -441,8 +496,8 @@ std::unique_ptr<ASTNode> Parser::parse_function_definition() {
     advance(); // consume 'fn'
 
     if (current_token().type != TokenType::Identifier) {
-        std::cerr << "parser error: expected function name after 'fn'\n";
-        exit(1);
+        error("expected function name after 'fn'");
+        return nullptr;
     }
     auto func_decl = std::make_unique<FunctionDeclNode>();
     func_decl->name = current_token().value;
@@ -455,12 +510,12 @@ std::unique_ptr<ASTNode> Parser::parse_function_definition() {
     expect(TokenType::Rarrow);
 
     if (!is_type_keyword(current_token().type)) {
-        std::cerr << "parser error: expected return type after '->'\n";
-        exit(1);
+        error("expected return type after '->'");
+        // set a default return type
+        func_decl->return_type.base_type = TokenType::VoidKeyword;
+    } else {
+        func_decl->return_type = parse_type();
     }
-
-    TypeInfo return_type_info = parse_type();
-    func_decl->return_type = return_type_info;
     // advance(); // consume return type
 
     expect(TokenType::Lbrace);
@@ -478,8 +533,8 @@ std::unique_ptr<ASTNode> Parser::parse_struct_definition() {
     advance(); // consume 'struct'
 
     if (current_token().type != TokenType::Identifier) {
-        std::cerr << "parser error: expected struct name\n";
-        exit(1);
+        error("expected struct name");
+        return nullptr;
     }
 
     auto _struct = std::make_unique<StructDeclNode>();
@@ -500,8 +555,10 @@ std::unique_ptr<ASTNode> Parser::parse_struct_definition() {
         TypeInfo field_type = parse_type();
 
         if (current_token().type != TokenType::Identifier) {
-            std::cerr << "parser error: expected field name in struct\n";
-            exit(1);
+            error("expected field name in struct");
+            // skip the bad token
+            advance();
+            continue;
         }
         std::string field_name = current_token().value;
         advance(); // consume field name
@@ -526,9 +583,18 @@ std::vector<Parameter> Parser::parse_parameters() {
            current_token().type != TokenType::EndOfFile) {
 
         if (current_token().type != TokenType::Identifier) {
-            std::cerr << "parser error: expected parameter name, got '"
-                      << current_token().value << "'\n";
-            exit(1);
+            error("expected parameter name, got '" + current_token().value + "'");
+            // skip to comma or ')'
+            while (current_token().type != TokenType::Comma &&
+                   current_token().type != TokenType::Rparen &&
+                   current_token().type != TokenType::EndOfFile) {
+                advance();
+            }
+            if (current_token().type == TokenType::Comma) {
+                advance();
+                continue;
+            }
+            break;
         }
 
         std::string param_name = current_token().value;
@@ -580,16 +646,18 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         advance();
         left = std::move(lit);
     } else if (current_token().type == TokenType::At) {
-        auto lit = std::make_unique<DereferenceNode>();
+        auto deref = std::make_unique<DereferenceNode>();
         advance(); //consume '@'
         if (current_token().type == TokenType::Lparen) {
-            advance(); //conssume lparen
-            lit->target = parse_expression();
+            advance(); //consume lparen
+            deref->target = parse_expression();
             expect(TokenType::Rparen);
         } else {
-            exit(1);
+            error("expected '(' after '@'");
+            // create a dummy target to avoid null pointer
+            deref->target = std::make_unique<LiteralNode>();
         }
-        left = std::move(lit);
+        left = std::move(deref);
     } else if (current_token().type == TokenType::String) {
         auto lit = std::make_unique<LiteralNode>();
         lit->value = "\"" + current_token().value + "\"";
@@ -665,8 +733,10 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         left = std::move(array_lit);
     }
     else {
-        // Unrecognised token  return an empty literal to avoid a null left
+        // Unrecognised token - return an empty literal to avoid a null left
+        error("unexpected token in expression: '" + current_token().value + "'");
         left = std::make_unique<LiteralNode>();
+        advance(); // skip the bad token
     }
 
     // Binary operator: wrap left and right in a BinOpNode

@@ -65,6 +65,12 @@ int main(int argc, char* argv[]) {
     parser.set_source_dir(source_dir);
     std::vector<std::unique_ptr<ASTNode>> ast = parser.parse_program();
 
+	// errors n stuff
+    if (parser.has_errors()) {
+        std::cerr << "pixel: compilation failed due to parser errors\n";
+        return 1;
+    }
+
     // Code generation
     Codegen codegen;
     codegen.set_source_dir(source_dir);

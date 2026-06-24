@@ -1,6 +1,16 @@
 #pragma once
 #include <string>
 
+struct SourceLocation {
+    std::string filename;
+    int line;
+    int column;
+    
+    std::string to_string() const {
+        return filename + ":" + std::to_string(line) + ":" + std::to_string(column);
+    }
+};
+
 enum class TokenType {
     // Literals
     Identifier,
@@ -68,6 +78,7 @@ enum class TokenType {
 struct Token {
     TokenType type;
     std::string value;
+    SourceLocation location;
 };
 
 // Holds full type info for any variable, parameter, or field

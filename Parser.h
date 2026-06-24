@@ -14,11 +14,19 @@ public:
 
     void set_source_dir(const std::string& dir) { source_dir = dir; }
 
+    bool has_errors() const { return error_count > 0; }
+    int get_error_count() const { return error_count; }
+
 private:
+    int error_count = 0;
+    
     Token peek(size_t offset = 1);
     std::vector<Token> tokens;
     size_t             pos;
     std::string        source_dir;
+
+    void error(const std::string& msg);
+    void fatal_error(const std::string& msg);
 
     // Shared across all Parser instances (including sub-parsers for #use'd files)
     // so that variables and imports stay consistent across the whole compilation.
