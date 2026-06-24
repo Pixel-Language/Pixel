@@ -120,6 +120,11 @@ std::string Codegen::infer_type(ASTNode* node) {
 
 std::string Codegen::generate_node(ASTNode* node) {
     if (!node) return "";
+    
+    if (auto grouping = dynamic_cast<GroupingNode*>(node)) {
+        return "(" + generate_node(grouping->expression.get()) + ")";
+    }
+
     if (auto ext_block = dynamic_cast<ExtBlockNode*>(node)) {
         return "    " + ext_block->raw_c_code + "\n";
     }

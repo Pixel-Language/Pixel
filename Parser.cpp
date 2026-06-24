@@ -555,10 +555,14 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
     std::unique_ptr<ASTNode> left;
 
     if (current_token().type == TokenType::Lparen) {
-        advance(); // consume lparen
+        advance();
         auto exp = parse_expression();
-        left = std::move(exp);
         expect(TokenType::Rparen);
+        
+        // put in a grouping node because bracket
+        auto grouping = std::make_unique<GroupingNode>();
+        grouping->expression = std::move(exp);
+        left = std::move(grouping);
     } else if (current_token().type == TokenType::True) {
         auto lit = std::make_unique<LiteralNode>();
         lit->value = "true";
