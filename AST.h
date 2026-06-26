@@ -57,6 +57,10 @@ struct ReturnNode : public ASTNode {
 struct IfNode : public ASTNode {
     std::unique_ptr<ASTNode> condition;
     std::vector<std::unique_ptr<ASTNode>> then_block;
+
+    std::vector<std::pair<std::unique_ptr<ASTNode>, std::vector<std::unique_ptr<ASTNode>>>> elif_blocks;
+    std::vector<std::unique_ptr<ASTNode>> else_block;
+
     bool is_unless = false;
 };
 

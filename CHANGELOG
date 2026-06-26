@@ -11,3 +11,4 @@ Version 0.3.0:
     added bracket support to parse_expression
     made groupingnode
     updated my horrible error system and made it a bit less horrible
+    added 'elif' and 'else' statements

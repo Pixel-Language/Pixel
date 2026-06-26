@@ -120,7 +120,7 @@ std::string Codegen::infer_type(ASTNode* node) {
 
 std::string Codegen::generate_node(ASTNode* node) {
     if (!node) return "";
-    
+
     if (auto grouping = dynamic_cast<GroupingNode*>(node)) {
         return "(" + generate_node(grouping->expression.get()) + ")";
     }
@@ -358,6 +358,31 @@ std::string Codegen::generate_node(ASTNode* node) {
         for (const auto& stmt : if_node->then_block) c_if += generate_node(stmt.get());
 
         c_if += "    }\n";
+
+        // Generate elif blocks
+        for (const auto& elif_pair : if_node->elif_blocks) {
+            const auto& elif_condition = elif_pair.first;
+            const auto& elif_body = elif_pair.second;
+            
+            c_if += "    else if (";
+            c_if += generate_node(elif_condition.get());
+            c_if += ") {\n";
+            
+            for (const auto& stmt : elif_body) {
+                c_if += generate_node(stmt.get());
+            }
+            
+            c_if += "    }\n";
+        }
+        
+        // Generate else block
+        if (!if_node->else_block.empty()) {
+            c_if += "    else {\n";
+            for (const auto& stmt : if_node->else_block) {
+                c_if += generate_node(stmt.get());
+            }
+            c_if += "    }\n";
+        }
 
         return c_if;
     }

@@ -307,7 +307,7 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         return while_node;
     }
 
-    // if (<condition>) { ... } and unless
+    // if (<condition>) { ... } and unless and else and the other thing
     if (current_token().type == TokenType::If || current_token().type == TokenType::Unless) {
         TokenType t = current_token().type;
 
@@ -318,17 +318,51 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
             if_node->is_unless = true;
         }
 
+        // parse main block
         expect(TokenType::Lparen);
         if_node->condition = parse_expression();
         expect(TokenType::Rparen);
 
         expect(TokenType::Lbrace);
         while (current_token().type != TokenType::Rbrace &&
-               current_token().type != TokenType::EndOfFile) {
+            current_token().type != TokenType::EndOfFile) {
             if (auto stmt = parse_statement())
                 if_node->then_block.push_back(std::move(stmt));
         }
         expect(TokenType::Rbrace);
+
+        // Parse any elif blocks
+        while (current_token().type == TokenType::Elif) {
+            advance(); // consume 'elif'
+
+            expect(TokenType::Lparen); //cnsume ')'
+            auto elif_condition = parse_expression();
+            expect(TokenType::Rparen); // consume ')'
+            
+            expect(TokenType::Lbrace);
+            std::vector<std::unique_ptr<ASTNode>> elif_body;
+            while (current_token().type != TokenType::Rbrace &&
+                current_token().type != TokenType::EndOfFile) {
+                if (auto stmt = parse_statement())
+                    elif_body.push_back(std::move(stmt));
+            }
+            expect(TokenType::Rbrace);
+            
+            if_node->elif_blocks.push_back(std::make_pair(std::move(elif_condition), std::move(elif_body)));
+        }
+
+        // Parse optional else block
+        if (current_token().type == TokenType::Else) {
+            advance(); // consume 'else'
+            
+            expect(TokenType::Lbrace);
+            while (current_token().type != TokenType::Rbrace &&
+                current_token().type != TokenType::EndOfFile) {
+                if (auto stmt = parse_statement())
+                    if_node->else_block.push_back(std::move(stmt));
+            }
+            expect(TokenType::Rbrace);
+        }
 
         return if_node;
     }
