@@ -12,3 +12,7 @@ Version 0.3.0:
     made groupingnode
     updated my horrible error system and made it a bit less horrible
     added 'elif' and 'else' statements
+
+Version 0.3.1:
+    added ability to make array-type pointers (pretty useless though)
+    TODO: type safety stuff 

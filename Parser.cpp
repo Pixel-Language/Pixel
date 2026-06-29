@@ -468,8 +468,15 @@ TypeInfo Parser::parse_type() {
         }
         info.base_type = current_token().type;
         info.is_array  = true;
+
         advance(); // consume element type
+
         expect(TokenType::Rparen);
+
+        if (current_token().type == TokenType::Mult) {
+            info.is_pointer = true;
+            advance(); // consume '*'
+        }
     }
     else if (is_type_keyword(current_token().type)) {
         info.base_type = current_token().type;

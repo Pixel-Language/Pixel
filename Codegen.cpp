@@ -35,7 +35,7 @@ std::string Codegen::type_info_to_c_string(const TypeInfo& info) {
         case TokenType::IntKeyword:    base = "int"; break;
         case TokenType::FloatKeyword:  base = "double"; break;
         case TokenType::BoolKeyword:   base = "bool"; break;
-        case TokenType::StringKeyword: base = "const char*"; break;
+        case TokenType::StringKeyword: base = "std::string"; break;
         case TokenType::VoidKeyword:   base = "void"; break;
         default:                       base = "int"; break;
     }
@@ -50,7 +50,7 @@ std::string Codegen::infer_type(ASTNode* node) {
     // literal or identifier
     if (auto lit = dynamic_cast<LiteralNode*>(node)) {
         std::string val = lit->value;
-        if (!val.empty() && val.front() == '"') return "const char*";
+        if (!val.empty() && val.front() == '"') return "std::string";
         if (val == "true" || val == "false") return "bool";
         if (val.find('.') != std::string::npos) return "double";
         if (!val.empty() && (std::isdigit(val[0]) || val[0] == '-')) return "int";
@@ -200,7 +200,7 @@ std::string Codegen::generate_node(ASTNode* node) {
                 c_type = "struct px_" + assign->type_info.struct_name;
             } else {
                 c_type =
-                    (type == "string") ? "const char*" :
+                    (type == "string") ? "std::string" :
                     (type == "bool") ? "bool" :
                     (type == "void") ? "void" :
                     (type == "float") ? "double" : "int";
@@ -413,7 +413,8 @@ std::string Codegen::generate_c_code(const std::vector<std::unique_ptr<ASTNode>>
 
     std::string complete_code =
         "#include <stdio.h>\n"
-        "#include <stdbool.h>\n";
+        "#include <stdbool.h>\n"
+        "#include <string>\n";
 
     for (const auto& inc : includes) {
         complete_code += "#include \"" + inc + "\"\n";
