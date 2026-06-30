@@ -69,6 +69,7 @@ enum class TokenType {
     Ext,
     RawExtCode,
     Struct,
+    Const,
 
     // Directives
     Bind,

@@ -170,7 +170,13 @@ std::string Codegen::generate_node(ASTNode* node) {
             value = generate_node(assign->expression.get());
         }
 
-        std::string final_id = "px_" + assign->identifier;
+        std::string final_id;
+
+        if (assign->is_const) {
+            final_id += "const ";
+        }
+
+        final_id += "px_" + assign->identifier;
 
         // auto keyword inference
         if (assign->is_declaration && assign->type_info.base_type == TokenType::AutoKeyword) {

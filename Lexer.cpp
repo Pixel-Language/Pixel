@@ -102,6 +102,7 @@ Token Lexer::parse_identifier() {
     if (result == "Int")    { tok.type = TokenType::IntKeyword; tok.value = result; return tok; }
     if (result == "Float")  { tok.type = TokenType::FloatKeyword; tok.value = result; return tok; }
     if (result == "String") { tok.type = TokenType::StringKeyword; tok.value = result; return tok; }
+    if (result == "const")  { tok.type = TokenType::Const; tok.value = result; return tok; }
     if (result == "Bool")   { tok.type = TokenType::BoolKeyword; tok.value = result; return tok; }
     if (result == "Void")   { tok.type = TokenType::VoidKeyword; tok.value = result; return tok; }
     if (result == "Array")  { tok.type = TokenType::ArrayKeyword; tok.value = result; return tok; }
@@ -116,7 +117,7 @@ Token Lexer::parse_identifier() {
     if (result == "and")    { tok.type = TokenType::And; tok.value = result; return tok; }
     if (result == "or")     { tok.type = TokenType::Or; tok.value = result; return tok; }
     if (result == "while")  { tok.type = TokenType::While; tok.value = result; return tok; }
-    if (result == "ext")    { tok.type = TokenType::Ext; tok.value = result; return tok; }
+    if (result == "ext_c")    { tok.type = TokenType::Ext; tok.value = result; return tok; }
     if (result == "elif")    { tok.type = TokenType::Elif; tok.value = result; return tok; }
     if (result == "else")    { tok.type = TokenType::Else; tok.value = result; return tok; }
     if (result == "struct") { tok.type = TokenType::Struct; tok.value = result; return tok; }

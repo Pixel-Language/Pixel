@@ -45,6 +45,7 @@ struct AssignNode : public ASTNode {
     std::string identifier;
     bool is_declaration = false;
     bool initialized = true;
+    bool is_const = false;
     TypeInfo    type_info;
     std::unique_ptr<ASTNode> expression;
 };

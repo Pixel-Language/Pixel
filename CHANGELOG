@@ -15,4 +15,6 @@ Version 0.3.0:
 
 Version 0.3.1:
     added ability to make array-type pointers (pretty useless though)
-    TODO: type safety stuff 
+    made strings use std::string
+    moved some builtins h funcs into the builtins.px
+    changed ext to ext_c for some reason

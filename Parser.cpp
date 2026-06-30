@@ -506,6 +506,12 @@ TypeInfo Parser::parse_type() {
 
 std::unique_ptr<ASTNode> Parser::parse_declaration(TypeInfo type_info) {
     // Variable name
+    bool is_const = false;
+    if (current_token().type == TokenType::Const) {
+        is_const = true;
+        advance(); //consume const
+    }
+
     if (current_token().type != TokenType::Identifier) {
         error("expected variable name after type");
         return nullptr;
@@ -514,6 +520,7 @@ std::unique_ptr<ASTNode> Parser::parse_declaration(TypeInfo type_info) {
     auto assign = std::make_unique<AssignNode>();
     assign->is_declaration = true;
     assign->type_info      = type_info;
+    assign->is_const = is_const;
 
     std::string var_name = current_token().value;
     assign->identifier   = var_name;
