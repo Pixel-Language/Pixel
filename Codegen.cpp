@@ -162,6 +162,26 @@ std::string Codegen::generate_node(ASTNode* node) {
         return "";
     }
 
+    if (auto nmsp = dynamic_cast<NamespaceNode*>(node)) {
+        bool was_return_code_true = return_code;
+
+        return_code = true;
+
+        std::string code;
+        code += "namespace px_" + nmsp->name + " {\n";
+
+        for (const auto& item : nmsp->contents) {
+            code += generate_node(item.get());
+        }
+        
+        code += "}\n";
+        
+        namespace_defenitions += code;
+
+        return_code = was_return_code_true;
+        return "";
+    }
+
     // variales 'n stuff
     if (auto assign = dynamic_cast<AssignNode*>(node)) {
         std::string value;
@@ -249,13 +269,22 @@ std::string Codegen::generate_node(ASTNode* node) {
         }
 
         c_code += "};\n\n";
-        struct_definitions += c_code;  // goes before main(), not inside it (i mean, i think.)
-        return "";
+
+        if (!return_code) {
+            struct_definitions += c_code;  // goes before main(), not inside it (i mean, i think.)
+            return "";
+        } else {
+            return c_code;
+        }
     }
 
     // val_thing->x  used as an expression
     if (auto arrow = dynamic_cast<ArrowNode*>(node)) {
         return "px_" + arrow->left + ".px_" + arrow->right;
+    }
+
+    if (auto nmsp = dynamic_cast<NamespaceAccNode*>(node)) {
+        return "px_" + nmsp->left + "::px_" + nmsp->right;
     }
 
     // arrow field WRITE val_thing->x = expr
@@ -342,8 +371,13 @@ std::string Codegen::generate_node(ASTNode* node) {
         current_function_params.clear();
 
         func_c_code += "}\n\n";
-        function_definitions += func_c_code;
-        return "";
+
+        if (!return_code) {
+            function_definitions += func_c_code;
+            return "";
+        } else {
+            return func_c_code;
+        }
     }
 
     if (auto if_node = dynamic_cast<IfNode*>(node)) {
@@ -411,6 +445,7 @@ std::string Codegen::generate_node(ASTNode* node) {
 std::string Codegen::generate_c_code(const std::vector<std::unique_ptr<ASTNode>>& ast) {
     struct_definitions   = "";
     function_definitions = "";
+    namespace_defenitions = "";
     std::string main_body = "";
     
     for (const auto& node : ast) {
@@ -426,7 +461,7 @@ std::string Codegen::generate_c_code(const std::vector<std::unique_ptr<ASTNode>>
         complete_code += "#include \"" + inc + "\"\n";
     }
 
-    complete_code += "\n" + struct_definitions + function_definitions + "int main() {\n" + main_body + "    return 0;\n}\n";
+    complete_code += "\n" + struct_definitions + function_definitions + namespace_defenitions + "int main() {\n" + main_body + "    return 0;\n}\n";
 
     includes.clear();
     return complete_code;

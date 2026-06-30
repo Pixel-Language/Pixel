@@ -25,8 +25,10 @@ public:
 private:
     std::string source_dir = ".";
     std::string stdlib_path = "lib/";
+    bool return_code = false;
     
     std::string struct_definitions;
+    std::string namespace_defenitions;
     std::string function_definitions;
     std::vector<std::string> includes;
     

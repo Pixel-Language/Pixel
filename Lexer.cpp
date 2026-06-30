@@ -118,6 +118,7 @@ Token Lexer::parse_identifier() {
     if (result == "or")     { tok.type = TokenType::Or; tok.value = result; return tok; }
     if (result == "while")  { tok.type = TokenType::While; tok.value = result; return tok; }
     if (result == "ext_c")    { tok.type = TokenType::Ext; tok.value = result; return tok; }
+    if (result == "namespace"){ tok.type = TokenType::Namespace; tok.value = result; return tok; }
     if (result == "elif")    { tok.type = TokenType::Elif; tok.value = result; return tok; }
     if (result == "else")    { tok.type = TokenType::Else; tok.value = result; return tok; }
     if (result == "struct") { tok.type = TokenType::Struct; tok.value = result; return tok; }
@@ -250,7 +251,15 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             
             case ',': tokens.push_back(make_token(TokenType::Comma, ",")); break;
-            case ':': tokens.push_back(make_token(TokenType::Colon, ":")); break;
+
+            case ':':
+                if (index + 1 < src.length() && src[index + 1] == ':') {
+                    tokens.push_back(make_token(TokenType::DoubleColon, "::")); //
+                    advance(); // consume '='
+                } else {
+                    tokens.push_back(make_token(TokenType::Colon, ":"));
+                }
+                break;
 
             case '-':
                 if (index + 1 < src.length() && src[index + 1] == '>') {

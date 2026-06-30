@@ -65,6 +65,11 @@ struct IfNode : public ASTNode {
     bool is_unless = false;
 };
 
+struct NamespaceNode : public ASTNode {
+    std::string name;
+    std::vector<std::unique_ptr<ASTNode>> contents;
+};
+
 struct WhileNode : public ASTNode {
     std::unique_ptr<ASTNode> condition;
     std::vector<std::unique_ptr<ASTNode>> body;
@@ -106,6 +111,11 @@ struct StructDeclNode : public ASTNode {
 };
 
 struct ArrowNode : public ASTNode {
+    std::string left;
+    std::string right;
+};
+
+struct NamespaceAccNode : public ASTNode {
     std::string left;
     std::string right;
 };

@@ -91,6 +91,7 @@ std::string Parser::token_type_to_string(TokenType type) {
         case TokenType::And: return "And";
         case TokenType::Or: return "Or";
         case TokenType::NullPtr: return "NullPtr";
+        case TokenType::Namespace: return "Namespace";
         default: return "Unknown";
     }
 }
@@ -305,6 +306,32 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         expect(TokenType::Rbrace);
 
         return while_node;
+    }
+
+    if (current_token().type == TokenType::Namespace) {
+        auto nmsp_node = std::make_unique<NamespaceNode>();
+        
+        advance(); // consume namespace
+
+        if (current_token().type != TokenType::Identifier) {
+            error("expected namespace name");
+            return nullptr;
+        }
+        
+        nmsp_node->name = current_token().value;
+        advance(); // consume name
+
+        expect(TokenType::Lbrace);
+
+        while (current_token().type != TokenType::Rbrace &&
+            current_token().type != TokenType::EndOfFile) {
+            if (auto stmt = parse_statement())
+                nmsp_node->contents.push_back(std::move(stmt));
+        }
+
+        expect(TokenType::Rbrace);
+
+        return nmsp_node;
     }
 
     // if (<condition>) { ... } and unless and else and the other thing
@@ -745,6 +772,16 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
             advance(); //consume arrow
 
             auto arrow = std::make_unique<ArrowNode>();
+            arrow->left = id;
+            arrow->right = current_token().value;
+
+            advance(); //consume right value
+
+            left = std::move(arrow);
+        } else if (current_token().type == TokenType::DoubleColon) {
+            advance(); //consume arrow
+
+            auto arrow = std::make_unique<NamespaceAccNode>();
             arrow->left = id;
             arrow->right = current_token().value;
 

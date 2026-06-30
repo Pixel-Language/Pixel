@@ -18,3 +18,6 @@ Version 0.3.1:
     made strings use std::string
     moved some builtins h funcs into the builtins.px
     changed ext to ext_c for some reason
+
+Version 0.4.0:
+    

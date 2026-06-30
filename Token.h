@@ -54,6 +54,7 @@ enum class TokenType {
     Rarrow,
     Comma,
     Colon,
+    DoubleColon,
     At,
 
     // Keywords
@@ -67,6 +68,7 @@ enum class TokenType {
     Return,
     FuncDefine,
     Ext,
+    Namespace,
     RawExtCode,
     Struct,
     Const,
