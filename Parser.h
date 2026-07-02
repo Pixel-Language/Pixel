@@ -34,6 +34,8 @@ private:
     inline static std::unordered_set<std::string> processed_files;
     inline static std::unordered_set<std::string> known_structs;   // tracks declared struct names
 
+    
+
     Token current_token();
     void  advance();
     void  expect(TokenType type);     // advance if match, print error otherwise
@@ -51,6 +53,10 @@ private:
 
     std::unique_ptr<ASTNode> parse_statement();
     std::unique_ptr<ASTNode> parse_expression();
+
+    std::unique_ptr<ASTNode> parse_funccall(std::string name);
+    std::unique_ptr<ASTNode> parse_array();
+    std::unique_ptr<ASTNode> parse_struct();
 
     // Parses any type annotation and returns a filled TypeInfo.
     // Handles: Int, Float, String, Bool, Void, Array(Int), Int*, MyStruct (for now)

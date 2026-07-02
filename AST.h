@@ -117,7 +117,7 @@ struct ArrowNode : public ASTNode {
 
 struct NamespaceAccNode : public ASTNode {
     std::string left;
-    std::string right;
+    std::unique_ptr<ASTNode> right;
 };
 
 // val_thing->x = <expression>

@@ -233,6 +233,28 @@ std::vector<std::unique_ptr<ASTNode>> Parser::parse_program() {
 
 // one statement at current pos
 
+std::unique_ptr<ASTNode> Parser::parse_funccall(std::string name) {
+    advance(); // consume '('
+    auto call_node = std::make_unique<FunctionCallNode>();
+    call_node->name = name;
+    call_node->is_statement = true;
+
+    while (current_token().type != TokenType::Rparen) {
+        call_node->arguments.push_back(parse_expression());
+        if (current_token().type == TokenType::Comma) advance();
+    }
+    expect(TokenType::Rparen);
+    return call_node;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_array() {
+
+}
+
+std::unique_ptr<ASTNode> Parser::parse_struct() {
+
+}
+
 std::unique_ptr<ASTNode> Parser::parse_statement() {
 
     // ext { <raw C code> }
@@ -416,17 +438,24 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
 
         // name(...) function call as a statement
         if (current_token().type == TokenType::Lparen) {
-            advance(); // consume '('
-            auto call_node = std::make_unique<FunctionCallNode>();
-            call_node->name = name;
-            call_node->is_statement = true;
+            return parse_funccall(name);
+        }
 
-            while (current_token().type != TokenType::Rparen) {
-                call_node->arguments.push_back(parse_expression());
-                if (current_token().type == TokenType::Comma) advance();
+        if (current_token().type == TokenType::DoubleColon) {
+            advance(); // consume '::'
+
+            auto arrow = std::make_unique<NamespaceAccNode>();
+            arrow->left = name;
+
+            if (current_token().type == TokenType::Lparen) {
+                arrow->right = parse_funccall(current_token().value);
             }
-            expect(TokenType::Rparen);
-            return call_node;
+
+            //arrow->right = current_token().value;
+
+            // advance(); //consume right value
+
+            return std::move(arrow);
         }
 
         // name->field = expr  struct field assignment
@@ -779,13 +808,16 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
 
             left = std::move(arrow);
         } else if (current_token().type == TokenType::DoubleColon) {
-            advance(); //consume arrow
+            advance(); //consume doublecolon
 
             auto arrow = std::make_unique<NamespaceAccNode>();
             arrow->left = id;
-            arrow->right = current_token().value;
 
-            advance(); //consume right value
+            // normal identifier
+            auto lit = std::make_unique<LiteralNode>();
+            lit->value = current_token().value;
+            advance(); // consume it
+            arrow->right = std::move(lit);
 
             left = std::move(arrow);
         } else if (current_token().type == TokenType::Lbracket) {

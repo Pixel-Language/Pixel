@@ -284,7 +284,7 @@ std::string Codegen::generate_node(ASTNode* node) {
     }
 
     if (auto nmsp = dynamic_cast<NamespaceAccNode*>(node)) {
-        return "px_" + nmsp->left + "::px_" + nmsp->right;
+        return "px_" + nmsp->left + "::" + generate_node(nmsp->right.get());
     }
 
     // arrow field WRITE val_thing->x = expr
