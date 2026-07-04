@@ -247,14 +247,6 @@ std::unique_ptr<ASTNode> Parser::parse_funccall(std::string name) {
     return call_node;
 }
 
-std::unique_ptr<ASTNode> Parser::parse_array() {
-
-}
-
-std::unique_ptr<ASTNode> Parser::parse_struct() {
-
-}
-
 std::unique_ptr<ASTNode> Parser::parse_statement() {
 
     // ext { <raw C code> }
@@ -416,6 +408,19 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         return if_node;
     }
 
+    if (current_token().type == TokenType::Identifier &&
+        peek(1).type == TokenType::DoubleColon &&
+        peek(2).type == TokenType::Identifier &&
+        known_structs.count(peek(2).value) &&
+        peek(3).type == TokenType::Identifier) {
+
+        TypeInfo type_info;
+        type_info.namespace_name = current_token().value; advance(); // thisLib
+        advance(); // ::
+        type_info.struct_name = current_token().value; advance();
+        return parse_declaration(type_info);
+    }
+
     // Int x = ....  or  String x = ...  /  Array(Int) x = ...  /  Int* x  etc etc
     if (is_type_keyword(current_token().type)) {
         TypeInfo type_info = parse_type(); // consumes the type tokens
@@ -444,11 +449,20 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         if (current_token().type == TokenType::DoubleColon) {
             advance(); // consume '::'
 
+            std::string member_name = current_token().value;
+            advance(); //consume it
+
             auto arrow = std::make_unique<NamespaceAccNode>();
             arrow->left = name;
 
             if (current_token().type == TokenType::Lparen) {
-                arrow->right = parse_funccall(current_token().value);
+                arrow->right = parse_funccall(member_name);
+            } else {
+                // Just a value
+                auto lit = std::make_unique<LiteralNode>();
+                lit->value = member_name;
+                arrow->right = std::move(lit);
+                // advance(); //consume it
             }
 
             //arrow->right = current_token().value;
@@ -588,7 +602,6 @@ std::unique_ptr<ASTNode> Parser::parse_declaration(TypeInfo type_info) {
         assign->initialized = true;
     } else {
         assign->initialized = false;
-        // no advance — the next token belongs to the next statement
     }
 
     declared_vars.insert(var_name);
@@ -724,6 +737,17 @@ std::vector<Parameter> Parser::parse_parameters() {
 std::unique_ptr<ASTNode> Parser::parse_expression() {
     std::unique_ptr<ASTNode> left;
 
+    bool is_unary_minus = false;
+    bool is_unary_plus = false;
+    
+    if (current_token().type == TokenType::Minus) {
+        is_unary_minus = true;
+        advance(); // consume '-'
+    } else if (current_token().type == TokenType::Plus) {
+        is_unary_plus = true;
+        advance(); // consume '+'
+    }
+
     if (current_token().type == TokenType::Lparen) {
         advance();
         auto exp = parse_expression();
@@ -854,6 +878,18 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         error("unexpected token in expression: '" + current_token().value + "'");
         left = std::make_unique<LiteralNode>();
         advance(); // skip the bad token
+    }
+
+    // unary ops
+    if (is_unary_minus) {
+        // Create 0,left
+        auto zero = std::make_unique<LiteralNode>();
+        zero->value = "0";
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = "-";
+        bin->left = std::move(zero);
+        bin->right = std::move(left);
+        left = std::move(bin);
     }
 
     // Binary operator: wrap left and right in a BinOpNode

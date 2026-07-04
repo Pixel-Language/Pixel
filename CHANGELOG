@@ -20,4 +20,6 @@ Version 0.3.1:
     changed ext to ext_c for some reason
 
 Version 0.4.0:
-    
+    namespaces
+    Type checkering (disabled for now)
+    fixed a bunch of busg

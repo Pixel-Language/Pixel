@@ -9,6 +9,7 @@
 #include "Lexer.h"
 #include "Parser.h"
 #include "Codegen.h"
+#include "TypeChecker.h"  // <-- ADD THIS
 
 // Detect OS at compile time (i havent tested this thing on linux yet, oh well)
 #ifdef _WIN32
@@ -56,7 +57,7 @@ int main(int argc, char* argv[]) {
     std::cout << "pixel: compiling " << source_file << "...\n";
 
     // Lexical analysis
-    Lexer lexer(source_code);
+    Lexer lexer(source_code, source_file);
     std::vector<Token> tokens = lexer.tokenize();
     std::cout << "lexer tokenized\n";
 
@@ -65,11 +66,20 @@ int main(int argc, char* argv[]) {
     parser.set_source_dir(source_dir);
     std::vector<std::unique_ptr<ASTNode>> ast = parser.parse_program();
 
-	// errors n stuff
+    // errors n stuff
     if (parser.has_errors()) {
         std::cerr << "pixel: compilation failed due to parser errors\n";
         return 1;
     }
+
+    // type checking stuff (removed for now because the typechecker is a load of work rn, will add back in a bit)
+    // std::cout << "type checking...\n";
+    // TypeChecker type_checker;
+    // if (!type_checker.check(ast)) {
+    //     std::cerr << "pixel: compilation failed due to type errors\n";
+    //     return 1;
+    // }
+    // std::cout << "type checking passed\n";
 
     // Code generation
     Codegen codegen;

@@ -28,7 +28,7 @@ private:
     bool return_code = false;
     
     std::string struct_definitions;
-    std::string namespace_defenitions;
+    std::string namespace_definitions;
     std::string function_definitions;
     std::vector<std::string> includes;
     

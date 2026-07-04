@@ -55,8 +55,6 @@ private:
     std::unique_ptr<ASTNode> parse_expression();
 
     std::unique_ptr<ASTNode> parse_funccall(std::string name);
-    std::unique_ptr<ASTNode> parse_array();
-    std::unique_ptr<ASTNode> parse_struct();
 
     // Parses any type annotation and returns a filled TypeInfo.
     // Handles: Int, Float, String, Bool, Void, Array(Int), Int*, MyStruct (for now)

@@ -176,7 +176,7 @@ std::string Codegen::generate_node(ASTNode* node) {
         
         code += "}\n";
         
-        namespace_defenitions += code;
+        namespace_definitions += code;
 
         return_code = was_return_code_true;
         return "";
@@ -223,7 +223,9 @@ std::string Codegen::generate_node(ASTNode* node) {
             std::string c_type;
 
             if (!assign->type_info.struct_name.empty()) {
-                c_type = "struct px_" + assign->type_info.struct_name;
+                c_type = assign->type_info.namespace_name.empty()
+                    ? "struct px_" + assign->type_info.struct_name
+                    : "px_" + assign->type_info.namespace_name + "::px_" + assign->type_info.struct_name;
             } else {
                 c_type =
                     (type == "string") ? "std::string" :
@@ -298,7 +300,7 @@ std::string Codegen::generate_node(ASTNode* node) {
         if (!lit->value.empty() && (std::isalpha(lit->value[0]) || lit->value[0] == '_')) {
             if (lit->value != "true" && lit->value != "false" && lit->value != "nullptr") {
                 if (current_function_params.find(lit->value) != current_function_params.end()) {
-                    return lit->value;  // Raw parameter name
+                    return "px_" + lit->value;  // Raw parameter name
                 }
                 return "px_" + lit->value;
             }
@@ -445,7 +447,7 @@ std::string Codegen::generate_node(ASTNode* node) {
 std::string Codegen::generate_c_code(const std::vector<std::unique_ptr<ASTNode>>& ast) {
     struct_definitions   = "";
     function_definitions = "";
-    namespace_defenitions = "";
+    namespace_definitions = "";
     std::string main_body = "";
     
     for (const auto& node : ast) {
@@ -461,7 +463,7 @@ std::string Codegen::generate_c_code(const std::vector<std::unique_ptr<ASTNode>>
         complete_code += "#include \"" + inc + "\"\n";
     }
 
-    complete_code += "\n" + struct_definitions + function_definitions + namespace_defenitions + "int main() {\n" + main_body + "    return 0;\n}\n";
+    complete_code += "\n" + struct_definitions + function_definitions + namespace_definitions + "int main() {\n" + main_body + "    return 0;\n}\n";
 
     includes.clear();
     return complete_code;

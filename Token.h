@@ -92,4 +92,8 @@ struct TypeInfo {
     bool        is_array    = false;
     bool        is_pointer  = false;
     std::string struct_name = "";   // non-empty when base_type == Identifier
+    std::string namespace_name = "";
+
+    TypeInfo() = default;
+    TypeInfo(TokenType t) : base_type(t) {}
 };
