@@ -61,13 +61,12 @@ struct IfNode : public ASTNode {
 
     std::vector<std::pair<std::unique_ptr<ASTNode>, std::vector<std::unique_ptr<ASTNode>>>> elif_blocks;
     std::vector<std::unique_ptr<ASTNode>> else_block;
-
-    bool is_unless = false;
 };
 
-struct NamespaceNode : public ASTNode {
-    std::string name;
-    std::vector<std::unique_ptr<ASTNode>> contents;
+// @target = expression
+struct DerefAssignNode : public ASTNode {
+    std::unique_ptr<ASTNode> target;   // the expression inside @(...)
+    std::unique_ptr<ASTNode> expression;
 };
 
 struct WhileNode : public ASTNode {
@@ -84,7 +83,6 @@ struct ExtBlockNode : public ASTNode {
 struct BindNode : public ASTNode {
     std::string filepath;
 };
-
 
 // One parameter in a function signature: name and type
 struct Parameter {
@@ -113,11 +111,6 @@ struct StructDeclNode : public ASTNode {
 struct ArrowNode : public ASTNode {
     std::string left;
     std::string right;
-};
-
-struct NamespaceAccNode : public ASTNode {
-    std::string left;
-    std::unique_ptr<ASTNode> right;
 };
 
 // val_thing->x = <expression>

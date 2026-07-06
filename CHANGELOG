@@ -17,9 +17,15 @@ Version 0.3.1:
     added ability to make array-type pointers (pretty useless though)
     made strings use std::string
     moved some builtins h funcs into the builtins.px
-    changed ext to ext_c for some reason
 
 Version 0.4.0:
     namespaces
-    Type checkering (disabled for now)
+    Type checking (disabled for now)
     fixed a bunch of busg
+
+Version 0.5.0:
+    made the interprter backend
+    purged unless, codegen and namespaces (lol)
+    removed typechecker because it sort of sucked and ill reimplement it later (im probably just going backwards at this point)
+    made syntax more consistent
+    added box-reference things

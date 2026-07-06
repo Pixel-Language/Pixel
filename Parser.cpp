@@ -5,11 +5,6 @@
 #include <iostream>
 #include <cctype>
 
-// constructor and token helpers
-
-// rm pixel.exe; g++ -std=c++17 -O3 -s main.cpp Lexer.cpp Parser.cpp Codegen.cpp -o pixel.exe; .\pixel.exe "test_doc.px" --keep-c-file
-
-// TODO: use this function (maybe)
 Token Parser::peek(size_t offset) {
     if (pos + offset >= tokens.size()) return { TokenType::EndOfFile, "" };
     return tokens[pos + offset];
@@ -90,8 +85,13 @@ std::string Parser::token_type_to_string(TokenType type) {
         case TokenType::Use: return "Use";
         case TokenType::And: return "And";
         case TokenType::Or: return "Or";
-        case TokenType::NullPtr: return "NullPtr";
-        case TokenType::Namespace: return "Namespace";
+        case TokenType::ExclamationMark: return "ExclamationMark";
+        case TokenType::NotEquals: return "NotEquals";
+        case TokenType::LessThanEqualTo: return "LessThanEqualTo";
+        case TokenType::GreaterThanEqualTo: return "GreaterThanEqualTo";
+        case TokenType::Elif: return "Elif";
+        case TokenType::Else: return "Else";
+        case TokenType::Const: return "Const";
         default: return "Unknown";
     }
 }
@@ -249,6 +249,18 @@ std::unique_ptr<ASTNode> Parser::parse_funccall(std::string name) {
 
 std::unique_ptr<ASTNode> Parser::parse_statement() {
 
+    if (current_token().type == TokenType::At) {
+        advance(); // consume '@'
+        expect(TokenType::Lparen);
+        auto target = parse_expression(); // the pointer expr
+        expect(TokenType::Rparen);
+        expect(TokenType::Equals);
+        auto deref_assign = std::make_unique<DerefAssignNode>();
+        deref_assign->target = std::move(target);
+        deref_assign->expression = parse_expression();
+        return deref_assign;
+    }
+
     // ext { <raw C code> }
     if (current_token().type == TokenType::Ext) {
         advance(); // consume 'ext'
@@ -322,42 +334,12 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         return while_node;
     }
 
-    if (current_token().type == TokenType::Namespace) {
-        auto nmsp_node = std::make_unique<NamespaceNode>();
-        
-        advance(); // consume namespace
-
-        if (current_token().type != TokenType::Identifier) {
-            error("expected namespace name");
-            return nullptr;
-        }
-        
-        nmsp_node->name = current_token().value;
-        advance(); // consume name
-
-        expect(TokenType::Lbrace);
-
-        while (current_token().type != TokenType::Rbrace &&
-            current_token().type != TokenType::EndOfFile) {
-            if (auto stmt = parse_statement())
-                nmsp_node->contents.push_back(std::move(stmt));
-        }
-
-        expect(TokenType::Rbrace);
-
-        return nmsp_node;
-    }
-
-    // if (<condition>) { ... } and unless and else and the other thing
-    if (current_token().type == TokenType::If || current_token().type == TokenType::Unless) {
+    // if (<condition>) { ... } and else and the other thing
+    if (current_token().type == TokenType::If) {
         TokenType t = current_token().type;
 
-        advance(); // consume 'if' or 'unless'
+        advance(); // consume 'if'
         auto if_node = std::make_unique<IfNode>();
-
-        if (t == TokenType::Unless) {
-            if_node->is_unless = true;
-        }
 
         // parse main block
         expect(TokenType::Lparen);
@@ -408,19 +390,6 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         return if_node;
     }
 
-    if (current_token().type == TokenType::Identifier &&
-        peek(1).type == TokenType::DoubleColon &&
-        peek(2).type == TokenType::Identifier &&
-        known_structs.count(peek(2).value) &&
-        peek(3).type == TokenType::Identifier) {
-
-        TypeInfo type_info;
-        type_info.namespace_name = current_token().value; advance(); // thisLib
-        advance(); // ::
-        type_info.struct_name = current_token().value; advance();
-        return parse_declaration(type_info);
-    }
-
     // Int x = ....  or  String x = ...  /  Array(Int) x = ...  /  Int* x  etc etc
     if (is_type_keyword(current_token().type)) {
         TypeInfo type_info = parse_type(); // consumes the type tokens
@@ -444,32 +413,6 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         // name(...) function call as a statement
         if (current_token().type == TokenType::Lparen) {
             return parse_funccall(name);
-        }
-
-        if (current_token().type == TokenType::DoubleColon) {
-            advance(); // consume '::'
-
-            std::string member_name = current_token().value;
-            advance(); //consume it
-
-            auto arrow = std::make_unique<NamespaceAccNode>();
-            arrow->left = name;
-
-            if (current_token().type == TokenType::Lparen) {
-                arrow->right = parse_funccall(member_name);
-            } else {
-                // Just a value
-                auto lit = std::make_unique<LiteralNode>();
-                lit->value = member_name;
-                arrow->right = std::move(lit);
-                // advance(); //consume it
-            }
-
-            //arrow->right = current_token().value;
-
-            // advance(); //consume right value
-
-            return std::move(arrow);
         }
 
         // name->field = expr  struct field assignment
@@ -524,7 +467,7 @@ TypeInfo Parser::parse_type() {
 
     if (current_token().type == TokenType::ArrayKeyword) {
         advance(); // consume 'Array'
-        expect(TokenType::Lparen);
+        expect(TokenType::Lbracket);
 
         if (!is_type_keyword(current_token().type)) {
             error("expected element type inside Array(...)");
@@ -541,7 +484,7 @@ TypeInfo Parser::parse_type() {
 
         advance(); // consume element type
 
-        expect(TokenType::Rparen);
+        expect(TokenType::Rbracket);
 
         if (current_token().type == TokenType::Mult) {
             info.is_pointer = true;
@@ -633,7 +576,6 @@ std::unique_ptr<ASTNode> Parser::parse_function_definition() {
     } else {
         func_decl->return_type = parse_type();
     }
-    // advance(); // consume return type
 
     expect(TokenType::Lbrace);
     while (current_token().type != TokenType::Rbrace &&
@@ -668,7 +610,7 @@ std::unique_ptr<ASTNode> Parser::parse_struct_definition() {
     while (current_token().type != TokenType::Rbrace &&
            current_token().type != TokenType::EndOfFile) {
 
-        // Parse the field type (Int, String, MyOther*, etc.)
+        // Parse field type
         TypeInfo field_type = parse_type();
 
         if (current_token().type != TokenType::Identifier) {
@@ -695,9 +637,27 @@ std::unique_ptr<ASTNode> Parser::parse_struct_definition() {
 // parse func params
 std::vector<Parameter> Parser::parse_parameters() {
     std::vector<Parameter> params;
-
     while (current_token().type != TokenType::Rparen &&
            current_token().type != TokenType::EndOfFile) {
+
+        if (!is_type_keyword(current_token().type) &&
+            !(current_token().type == TokenType::Identifier &&
+              known_structs.count(current_token().value))) {
+            error("expected parameter type, got '" + current_token().value + "'");
+            // skip to comma or ')'
+            while (current_token().type != TokenType::Comma &&
+                   current_token().type != TokenType::Rparen &&
+                   current_token().type != TokenType::EndOfFile) {
+                advance();
+            }
+            if (current_token().type == TokenType::Comma) {
+                advance();
+                continue;
+            }
+            break;
+        }
+
+        TypeInfo type_info = parse_type();
 
         if (current_token().type != TokenType::Identifier) {
             error("expected parameter name, got '" + current_token().value + "'");
@@ -717,10 +677,6 @@ std::vector<Parameter> Parser::parse_parameters() {
         std::string param_name = current_token().value;
         advance(); // consume parameter name
 
-        expect(TokenType::Colon);
-
-        TypeInfo type_info = parse_type();
-
         Parameter param;
         param.name      = param_name;
         param.type_info = type_info;
@@ -738,14 +694,10 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
     std::unique_ptr<ASTNode> left;
 
     bool is_unary_minus = false;
-    bool is_unary_plus = false;
     
     if (current_token().type == TokenType::Minus) {
         is_unary_minus = true;
         advance(); // consume '-'
-    } else if (current_token().type == TokenType::Plus) {
-        is_unary_plus = true;
-        advance(); // consume '+'
     }
 
     if (current_token().type == TokenType::Lparen) {
@@ -773,19 +725,6 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         lit->value = "nullptr";
         advance();
         left = std::move(lit);
-    } else if (current_token().type == TokenType::At) {
-        auto deref = std::make_unique<DereferenceNode>();
-        advance(); //consume '@'
-        if (current_token().type == TokenType::Lparen) {
-            advance(); //consume lparen
-            deref->target = parse_expression();
-            expect(TokenType::Rparen);
-        } else {
-            error("expected '(' after '@'");
-            // create a dummy target to avoid null pointer
-            deref->target = std::make_unique<LiteralNode>();
-        }
-        left = std::move(deref);
     } else if (current_token().type == TokenType::String) {
         auto lit = std::make_unique<LiteralNode>();
         lit->value = "\"" + current_token().value + "\"";
@@ -803,6 +742,15 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         lit->value = current_token().value;
         advance();
         left = std::move(lit);
+    }
+    else if (current_token().type == TokenType::At) {
+        advance(); // consume '@'
+        expect(TokenType::Lparen);
+        auto target = parse_expression();
+        expect(TokenType::Rparen);
+        auto deref = std::make_unique<DereferenceNode>();
+        deref->target = std::move(target);
+        left = std::move(deref);
     }
 	else if (current_token().type == TokenType::Identifier || is_type_keyword(current_token().type)) {
         std::string id = current_token().value;
@@ -829,19 +777,6 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
             arrow->right = current_token().value;
 
             advance(); //consume right value
-
-            left = std::move(arrow);
-        } else if (current_token().type == TokenType::DoubleColon) {
-            advance(); //consume doublecolon
-
-            auto arrow = std::make_unique<NamespaceAccNode>();
-            arrow->left = id;
-
-            // normal identifier
-            auto lit = std::make_unique<LiteralNode>();
-            lit->value = current_token().value;
-            advance(); // consume it
-            arrow->right = std::move(lit);
 
             left = std::move(arrow);
         } else if (current_token().type == TokenType::Lbracket) {

@@ -112,14 +112,12 @@ Token Lexer::parse_identifier() {
     if (result == "false")  { tok.type = TokenType::False; tok.value = result; return tok; }
     if (result == "return") { tok.type = TokenType::Return; tok.value = result; return tok; }
     if (result == "fn")     { tok.type = TokenType::FuncDefine; tok.value = result; return tok; }
-    if (result == "if")     { tok.type = TokenType::If; tok.value = result; return tok; }
-    if (result == "unless") { tok.type = TokenType::Unless; tok.value = result; return tok; }
     if (result == "and")    { tok.type = TokenType::And; tok.value = result; return tok; }
     if (result == "or")     { tok.type = TokenType::Or; tok.value = result; return tok; }
     if (result == "while")  { tok.type = TokenType::While; tok.value = result; return tok; }
     if (result == "ext_c")    { tok.type = TokenType::Ext; tok.value = result; return tok; }
-    if (result == "namespace"){ tok.type = TokenType::Namespace; tok.value = result; return tok; }
     if (result == "elif")    { tok.type = TokenType::Elif; tok.value = result; return tok; }
+    if (result == "if")    { tok.type = TokenType::If; tok.value = result; return tok; }
     if (result == "else")    { tok.type = TokenType::Else; tok.value = result; return tok; }
     if (result == "struct") { tok.type = TokenType::Struct; tok.value = result; return tok; }
 
@@ -252,14 +250,7 @@ std::vector<Token> Lexer::tokenize() {
             
             case ',': tokens.push_back(make_token(TokenType::Comma, ",")); break;
 
-            case ':':
-                if (index + 1 < src.length() && src[index + 1] == ':') {
-                    tokens.push_back(make_token(TokenType::DoubleColon, "::")); //
-                    advance(); // consume '='
-                } else {
-                    tokens.push_back(make_token(TokenType::Colon, ":"));
-                }
-                break;
+            case ':': tokens.push_back(make_token(TokenType::Colon, ":")); break;
 
             case '-':
                 if (index + 1 < src.length() && src[index + 1] == '>') {
