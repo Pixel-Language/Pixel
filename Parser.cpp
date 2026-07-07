@@ -251,9 +251,8 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
 
     if (current_token().type == TokenType::At) {
         advance(); // consume '@'
-        expect(TokenType::Lparen);
         auto target = parse_expression(); // the pointer expr
-        expect(TokenType::Rparen);
+        expect(TokenType::At);
         expect(TokenType::Equals);
         auto deref_assign = std::make_unique<DerefAssignNode>();
         deref_assign->target = std::move(target);
@@ -319,9 +318,9 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         advance(); // consume 'while'
         auto while_node = std::make_unique<WhileNode>();
 
-        expect(TokenType::Lparen);
+        // expect(TokenType::Lparen);
         while_node->condition = parse_expression();
-        expect(TokenType::Rparen);
+        // expect(TokenType::Rparen);
 
         expect(TokenType::Lbrace);
         while (current_token().type != TokenType::Rbrace &&
@@ -342,9 +341,9 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         auto if_node = std::make_unique<IfNode>();
 
         // parse main block
-        expect(TokenType::Lparen);
+        // expect(TokenType::Lparen);
         if_node->condition = parse_expression();
-        expect(TokenType::Rparen);
+        // expect(TokenType::Rparen);
 
         expect(TokenType::Lbrace);
         while (current_token().type != TokenType::Rbrace &&
@@ -358,9 +357,9 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         while (current_token().type == TokenType::Elif) {
             advance(); // consume 'elif'
 
-            expect(TokenType::Lparen); //cnsume ')'
+            // expect(TokenType::Lparen); //cnsume ')'
             auto elif_condition = parse_expression();
-            expect(TokenType::Rparen); // consume ')'
+            // expect(TokenType::Rparen); // consume ')'
             
             expect(TokenType::Lbrace);
             std::vector<std::unique_ptr<ASTNode>> elif_body;
@@ -567,15 +566,21 @@ std::unique_ptr<ASTNode> Parser::parse_function_definition() {
     func_decl->parameters = parse_parameters();
     expect(TokenType::Rparen);
 
-    expect(TokenType::Rarrow);
+    if (current_token().type == TokenType::Rarrow) {
+        advance();
 
-    if (!is_type_keyword(current_token().type)) {
-        error("expected return type after '->'");
-        // set a default return type
-        func_decl->return_type.base_type = TokenType::VoidKeyword;
-    } else {
+        if (!is_type_keyword(current_token().type)) {
+            error("expected return type after '->'");
+            // set a default return type
+            func_decl->return_type.base_type = TokenType::VoidKeyword;
+        }
+
         func_decl->return_type = parse_type();
+    } else {
+        func_decl->return_type.base_type = TokenType::VoidKeyword;
     }
+
+    //expect(TokenType::Rarrow);
 
     expect(TokenType::Lbrace);
     while (current_token().type != TokenType::Rbrace &&
@@ -694,10 +699,14 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
     std::unique_ptr<ASTNode> left;
 
     bool is_unary_minus = false;
+    bool is_unary_not = false;
     
     if (current_token().type == TokenType::Minus) {
         is_unary_minus = true;
         advance(); // consume '-'
+    } else if (current_token().type == TokenType::ExclamationMark) {
+        is_unary_not = true;
+        advance(); // consume '!'
     }
 
     if (current_token().type == TokenType::Lparen) {
@@ -745,9 +754,8 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
     }
     else if (current_token().type == TokenType::At) {
         advance(); // consume '@'
-        expect(TokenType::Lparen);
         auto target = parse_expression();
-        expect(TokenType::Rparen);
+        expect(TokenType::At);
         auto deref = std::make_unique<DereferenceNode>();
         deref->target = std::move(target);
         left = std::move(deref);
@@ -825,7 +833,16 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         bin->left = std::move(zero);
         bin->right = std::move(left);
         left = std::move(bin);
+    } else if (is_unary_not) {
+        auto false_lit = std::make_unique<LiteralNode>();
+        false_lit->value = "false";
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = "==";
+        bin->left = std::move(left);
+        bin->right = std::move(false_lit);
+        left = std::move(bin);
     }
+
 
     // Binary operator: wrap left and right in a BinOpNode
     if (current_token().type == TokenType::Plus        ||

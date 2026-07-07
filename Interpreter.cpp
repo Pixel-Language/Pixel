@@ -328,30 +328,74 @@ Value Interpreter::visit_call(FunctionCallNode* node) {
     if (node->name == "to_string") {
         if (node->arguments.empty()) return Value::make_nil();
         Value arg = visit(node->arguments[0].get());
-        std::string result = value_to_string(arg); // materialize temporar
+        std::string result = value_to_string(arg); // materialize temporaryly
         return Value::make_string(intern_string(result));   // now its a stable pool owned pointer
     }
 
-    if (node->name == "input") {
-        std::string* str;
-        std::cin >> *str;
-        return Value::make_string(str);
+    if (node->name == "to_int") {
+        if (node->arguments.empty()) return Value::make_nil();
+        Value arg = visit(node->arguments[0].get());
+        if (arg.type == Value::TYPE_INT)   return arg;
+        if (arg.type == Value::TYPE_FLOAT) return Value::make_int((int64_t)arg.as_float); // truncates toward zero
+        if (arg.type == Value::TYPE_BOOL)  return Value::make_int(arg.as_bool ? 1 : 0);
+        if (arg.type == Value::TYPE_STRING) {
+            try {
+                return Value::make_int(std::stoll(*arg.as_string));
+            } catch (...) {
+                error("to_int: cannot convert string '" + *arg.as_string + "' to int");
+                return Value::make_nil();
+            }
+        }
+        error("to_int: cannot convert this type to int");
+        return Value::make_nil();
     }
 
-    if (node->name == "input_word") {
-        std::string* str;
-        getline(std::cin, *str);
-        return Value::make_string(str);
+    if (node->name == "to_float") {
+        if (node->arguments.empty()) return Value::make_nil();
+        Value arg = visit(node->arguments[0].get());
+        if (arg.type == Value::TYPE_FLOAT) return arg;
+        if (arg.type == Value::TYPE_INT)   return Value::make_float((double)arg.as_int);
+        if (arg.type == Value::TYPE_STRING) {
+            try {
+                return Value::make_float(std::stod(*arg.as_string));
+            } catch (...) {
+                error("to_float: cannot convert string '" + *arg.as_string + "' to float");
+                return Value::make_nil();
+            }
+        }
+        error("to_float: cannot convert this type to float");
+        return Value::make_nil();
+    }
+
+    if (node->name == "to_bool") {
+        if (node->arguments.empty()) return Value::make_nil();
+        Value arg = visit(node->arguments[0].get());
+        if (arg.type == Value::TYPE_BOOL) return arg;
+        error("to_bool: only bool values can be converted to bool");
+        return Value::make_nil();
+    }
+
+    if (node->name == "input") {
+        std::string str;
+        std::cin >> str;
+        return Value::make_string(intern_string(str));
+    }
+
+    if (node->name == "input_line") {
+        std::string str;
+        std::getline(std::cin, str);
+        return Value::make_string(intern_string(str));
     }
 
     if (node->name == "length") {
         if (node->arguments.empty()) return Value::make_nil();
         Value arg = visit(node->arguments[0].get());
         if (arg.type == Value::TYPE_STRING && arg.as_string) {
-            return Value::make_int(arg.as_string->length());
+            return Value::make_int((int64_t)arg.as_string->length());
         } else if (arg.type == Value::TYPE_ARRAY && arg.as_array) {
-            return Value::make_int(sizeof(arg.as_array) / sizeof(arg.as_array[0]));
+            return Value::make_int((int64_t)arg.as_array->size());
         }
+        error("length: argument must be a string or array");
         return Value::make_nil();
     }
 
