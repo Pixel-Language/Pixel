@@ -115,7 +115,6 @@ Token Lexer::parse_identifier() {
     if (result == "and")    { tok.type = TokenType::And; tok.value = result; return tok; }
     if (result == "or")     { tok.type = TokenType::Or; tok.value = result; return tok; }
     if (result == "while")  { tok.type = TokenType::While; tok.value = result; return tok; }
-    if (result == "ext_c")    { tok.type = TokenType::Ext; tok.value = result; return tok; }
     if (result == "elif")    { tok.type = TokenType::Elif; tok.value = result; return tok; }
     if (result == "if")    { tok.type = TokenType::If; tok.value = result; return tok; }
     if (result == "else")    { tok.type = TokenType::Else; tok.value = result; return tok; }
@@ -168,27 +167,6 @@ std::vector<Token> Lexer::tokenize() {
         if (std::isalpha(current_char) || current_char == '_') {
             Token t = parse_identifier();
             tokens.push_back(t);
-
-            // parser never has to deal with raw C syntax inside the braces
-            if (t.type == TokenType::Ext) {
-                skip_whitespace();
-                if (current_char == '{') {
-                    tokens.push_back(make_token(TokenType::Lbrace, "{"));
-                    advance(); // consume '{'
-
-                    std::string raw_c;
-                    int depth = 1;
-                    while (current_char != '\0' && depth > 0) {
-                        if      (current_char == '{') depth++;
-                        else if (current_char == '}') depth--;
-                        if (depth > 0) { raw_c += current_char; advance(); }
-                    }
-
-                    tokens.push_back(make_token(TokenType::RawExtCode, raw_c));
-                    tokens.push_back(make_token(TokenType::Rbrace, "}"));
-                    advance(); // consume closing '}'
-                }
-            }
             continue;
         }
 
@@ -200,8 +178,7 @@ std::vector<Token> Lexer::tokenize() {
             advance(); // consume '#'
             if (std::isalpha(current_char)) {
                 Token directive = parse_identifier();
-                if      (directive.value == "bind") tokens.push_back(make_token(TokenType::Bind, "bind"));
-                else if (directive.value == "use")  tokens.push_back(make_token(TokenType::Use, "use"));
+                if (directive.value == "use")  tokens.push_back(make_token(TokenType::Use, "use"));
                 else std::cerr << filename << ":" << line << ":" << column 
                                << " lexer error: unknown directive '#" << directive.value << "'\n";
             }

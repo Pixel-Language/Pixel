@@ -33,4 +33,4 @@ Version 0.5.0:
 Version 0.5.1:
     made functions not require ->
     made if, elif, and while statements not use brackets
-    fixed builtin funcs
+    fixed builtin funcs and added more conversion funcs

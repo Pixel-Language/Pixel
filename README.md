@@ -1,5 +1,7 @@
 # Pixel Language Documentation
 
+warning: this doc is dreadfully outdated
+
 ## Overview
 
 Pixel is a statically-typed programming language that compiles to C. It features a syntax inspired by modern languages with built-in support for structs, functions, arrays, pointers, and C interop and also probably more stuff that ill make soon (i mean, duh, it's in beta)

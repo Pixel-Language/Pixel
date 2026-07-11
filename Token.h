@@ -65,13 +65,10 @@ enum class TokenType {
     While,
     Return,
     FuncDefine,
-    Ext,
-    RawExtCode,
     Struct,
     Const,
 
     // Directives
-    Bind,
     Use,
 
     EndOfFile

@@ -6,7 +6,7 @@ rmdir /s /q pixel_release 2>nul
 del pixel-release.zip 2>nul
 
 REM Compile
-g++ -std=c++17 -O3 -s -o pixel.exe main.cpp Lexer.cpp Parser.cpp Interpreter.cpp -I.
+g++ -std=c++17 -O3 -s -o pixel.exe main.cpp Lexer.cpp Parser.cpp Typechecker.cpp Interpreter.cpp -I.
 
 REM Create folder and copy
 mkdir pixel_release

@@ -42,10 +42,8 @@ void Parser::advance() {
 
 std::string Parser::token_type_to_string(TokenType type) {
     switch(type) {
-        case TokenType::Ext: return "Ext";
         case TokenType::Lbrace: return "Lbrace";
         case TokenType::Rbrace: return "Rbrace";
-        case TokenType::RawExtCode: return "RawExtCode";
         case TokenType::Identifier: return "Identifier";
         case TokenType::IntKeyword: return "IntKeyword";
         case TokenType::StringKeyword: return "StringKeyword";
@@ -81,7 +79,6 @@ std::string Parser::token_type_to_string(TokenType type) {
         case TokenType::GreaterThan: return "GreaterThan";
         case TokenType::Comma: return "Comma";
         case TokenType::Colon: return "Colon";
-        case TokenType::Bind: return "Bind";
         case TokenType::Use: return "Use";
         case TokenType::And: return "And";
         case TokenType::Or: return "Or";
@@ -258,42 +255,6 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         deref_assign->target = std::move(target);
         deref_assign->expression = parse_expression();
         return deref_assign;
-    }
-
-    // ext { <raw C code> }
-    if (current_token().type == TokenType::Ext) {
-        advance(); // consume 'ext'
-        if (current_token().type != TokenType::Lbrace) {
-            error("expected '{' after 'ext'");
-            return nullptr;  // return nullptr to signal error
-        }
-
-        expect(TokenType::Lbrace); // this will consume '{' or skip on error
-
-        auto ext_block = std::make_unique<ExtBlockNode>();
-        if (current_token().type == TokenType::RawExtCode) {
-            ext_block->raw_c_code = current_token().value;
-            advance();
-        } else {
-            error("expected raw C code inside ext block");
-        }
-
-        expect(TokenType::Rbrace);
-        return ext_block;
-    }
-
-    // #bind "file.h"  C header to include in generated output
-    if (current_token().type == TokenType::Bind) {
-        advance(); // consume 'bind'
-
-        if (current_token().type != TokenType::String) {
-            error("#bind expects a file path string");
-            return nullptr;
-        }
-        auto bind_node = std::make_unique<BindNode>();
-        bind_node->filepath = current_token().value;
-        advance();
-        return bind_node;
     }
 
     // fn name(...) -> Type { ... }

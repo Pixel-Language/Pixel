@@ -9,6 +9,7 @@
 #include "Lexer.h"
 #include "Parser.h"
 #include "Interpreter.h"
+#include "TypeChecker.h"
 
 #ifdef _WIN32
     #define PLATFORM_WINDOWS 1
@@ -74,6 +75,19 @@ int main(int argc, char* argv[]) {
     // std::cout << "type checking passed\n";
 
     // interpreter backend
+
+    std::cout << "pixel: type checking...\n";
+
+    TypeChecker typechecker;
+
+    bool t = typechecker.check_program(ast);
+
+    if (!t) {
+        return 1;
+    }
+
+    std::cout << "pixel: types checked\n";
+
     std::cout << "pixel: running interpreter...\n";
     Interpreter interpreter;
     interpreter.interpret(ast);
