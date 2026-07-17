@@ -33,6 +33,7 @@ enum class TokenType {
     // Operators
     Equals,
     NotEquals, //do this
+    Modulo,
     ExclamationMark,
     DoubleEquals,
     Plus,
@@ -67,6 +68,8 @@ enum class TokenType {
     FuncDefine,
     Struct,
     Const,
+    Break,
+    Continue,
 
     // Directives
     Use,

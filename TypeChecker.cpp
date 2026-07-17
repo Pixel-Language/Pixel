@@ -173,6 +173,10 @@ void TypeChecker::check_statement(ASTNode* node) {
         return;
     }
 
+    if (auto lc = dynamic_cast<LoopControlNode*>(node)) {
+        return;
+    }
+
     // @target@ = expr
     if (auto deref_assign = dynamic_cast<DerefAssignNode*>(node)) {
         TypeInfo target_type = check_expression(deref_assign->target.get());

@@ -124,3 +124,8 @@ struct ArrowAssignNode : public ASTNode {
 struct GroupingNode : public ASTNode {
     std::unique_ptr<ASTNode> expression;
 };
+
+
+struct LoopControlNode : public ASTNode {
+    std::string type;
+};

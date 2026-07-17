@@ -272,13 +272,13 @@ Value Interpreter::visit_binop(BinOpNode* node) {
         return Value::make_bool(result);
     }
 
-    if (op == "&&") {
+    if (op == "and") {
         bool l = (left.type == Value::TYPE_BOOL) ? left.as_bool : false;
         bool r = (right.type == Value::TYPE_BOOL) ? right.as_bool : false;
         return Value::make_bool(l && r);
     }
 
-    if (op == "||") {
+    if (op == "or") {
         bool l = (left.type == Value::TYPE_BOOL) ? left.as_bool : false;
         bool r = (right.type == Value::TYPE_BOOL) ? right.as_bool : false;
         return Value::make_bool(l || r);
@@ -514,6 +514,12 @@ Value Interpreter::visit_index_access(IndexAccessNode* node) {
 void Interpreter::visit_statement(ASTNode* node) {
     if (!node) return;
 
+
+    if (auto lc = dynamic_cast<LoopControlNode*>(node)) {
+        if (lc->type == "break") throw BreakSignal{};
+        else throw ContinueSignal{};
+    }
+
     if (auto ifn = dynamic_cast<IfNode*>(node)) {
         Value cond = visit(ifn->condition.get());
         if (cond.type == Value::TYPE_BOOL && cond.as_bool) {
@@ -557,10 +563,17 @@ void Interpreter::visit_statement(ASTNode* node) {
     if (auto whl = dynamic_cast<WhileNode*>(node)) {
         ScopeGuard guard(*this);
         while (true) {
-            Value cond = visit(whl->condition.get()); // re-checked every iteration
+            Value cond = visit(whl->condition.get());
             if (!(cond.type == Value::TYPE_BOOL && cond.as_bool)) break;
-            for (auto& stmt : whl->body)
-                visit_statement(stmt.get());
+
+            try {
+                for (auto& stmt : whl->body)
+                    visit_statement(stmt.get());
+            } catch (BreakSignal&) {
+                break;
+            } catch (ContinueSignal&) {
+                continue;
+            }
         }
         return;
     }

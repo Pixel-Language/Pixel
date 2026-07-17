@@ -34,6 +34,9 @@ struct ReturnSignal {
     Value value;
 };
 
+struct BreakSignal {};
+struct ContinueSignal {};
+
 class Interpreter {
 public:
     void interpret(const std::vector<std::unique_ptr<ASTNode>>& ast);

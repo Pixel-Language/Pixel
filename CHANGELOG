@@ -1,36 +1,52 @@
 
-Version 0.2.0:
+Version 0.1.0 (2026-06-22):
+    Initial Release
+
+Version 0.1.1 (2026-06-22):
+    changed smart to auto
+    made auto support way more stuff (still not real type inference yet)
+    probably one more change that i forgot, wwhatever
+
+Version 0.2.0 (2026-06-23):
     made the dereference require bracket (so i can have expressinos and not just normal vars)and made dereferences use an astnode and not a string
     added a way to debug tokens
     fixed this big error with function defenition parsing
     added unless keyword
     added <=, >=, and !=
 
-Version 0.3.0:
+Version 0.3.0 (2026-06-26):
     added 'not' and 'and' keywords
     added bracket support to parse_expression
     made groupingnode
     updated my horrible error system and made it a bit less horrible
     added 'elif' and 'else' statements
 
-Version 0.3.1:
+Version 0.3.1 (2026-06-30):
     added ability to make array-type pointers (pretty useless though)
     made strings use std::string
     moved some builtins h funcs into the builtins.px
 
-Version 0.4.0:
+Version 0.4.0 (2026-07-04):
     namespaces
     Type checking (disabled for now)
     fixed a bunch of busg
 
-Version 0.5.0:
+Version 0.5.0 (2026-07-06):
     made the interprter backend
     purged unless, codegen and namespaces (lol)
     removed typechecker because it sort of sucked and ill reimplement it later (im probably just going backwards at this point)
     made syntax more consistent
     added box-reference things
 
-Version 0.5.1:
+Version 0.5.1 (2026-07-07):
     made functions not require ->
     made if, elif, and while statements not use brackets
     fixed builtin funcs and added more conversion funcs
+
+Version 0.6.0 (2026-07-11):
+    added typechecking
+    removed ext and bind; theyre useless with my new interpreter model thing
+
+Version 0.6.1 (2026-07-17):
+    added break and continue
+    fixed "and" and "or"

@@ -116,6 +116,8 @@ Token Lexer::parse_identifier() {
     if (result == "or")     { tok.type = TokenType::Or; tok.value = result; return tok; }
     if (result == "while")  { tok.type = TokenType::While; tok.value = result; return tok; }
     if (result == "elif")    { tok.type = TokenType::Elif; tok.value = result; return tok; }
+    if (result == "break")    { tok.type = TokenType::Break; tok.value = result; return tok; }
+    if (result == "continue")    { tok.type = TokenType::Continue; tok.value = result; return tok; }
     if (result == "if")    { tok.type = TokenType::If; tok.value = result; return tok; }
     if (result == "else")    { tok.type = TokenType::Else; tok.value = result; return tok; }
     if (result == "struct") { tok.type = TokenType::Struct; tok.value = result; return tok; }

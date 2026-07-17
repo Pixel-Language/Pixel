@@ -257,6 +257,20 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         return deref_assign;
     }
 
+    if (current_token().type == TokenType::Break) {
+        advance(); // consume 'break'
+        auto node = std::make_unique<LoopControlNode>();
+        node->type = "break";
+        return node;
+    }
+
+    if (current_token().type == TokenType::Continue) {
+        advance(); // consume 'continue'
+        auto node = std::make_unique<LoopControlNode>();
+        node->type = "continue";
+        return node;
+    }
+
     // fn name(...) -> Type { ... }
     if (current_token().type == TokenType::FuncDefine) {
         return parse_function_definition();
@@ -823,9 +837,9 @@ std::unique_ptr<ASTNode> Parser::parse_expression() {
         bin_op->op    = current_token().value;
 
         if (current_token().type == TokenType::And) {
-            bin_op->op = "&&";
+            bin_op->op = "and";
         } else if (current_token().type == TokenType::Or) {
-            bin_op->op = "||";
+            bin_op->op = "or";
         }
 
         bin_op->left  = std::move(left);
