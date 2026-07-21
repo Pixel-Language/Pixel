@@ -12,6 +12,12 @@ bool TypeChecker::is_numeric(const TypeInfo& t) {
 }
 
 std::string TypeChecker::type_to_string(const TypeInfo& t) {
+    if (t.is_array) {
+        std::string inner = t.inner_type ? type_to_string(*t.inner_type) : "<unknown>";
+        std::string res = "Array[" + inner + "]";
+        if (t.is_pointer) res += "*";
+        return res;
+    }
     std::string base;
     switch (t.base_type) {
         case TokenType::IntKeyword:    base = "Int"; break;
@@ -22,16 +28,14 @@ std::string TypeChecker::type_to_string(const TypeInfo& t) {
         case TokenType::Identifier:    base = t.struct_name.empty() ? "<unknown>" : t.struct_name; break;
         default:                       base = "<unknown>"; break;
     }
-    if (t.is_array)   base = "Array(" + base + ")";
     if (t.is_pointer) base += "*";
     return base;
 }
 
 // exact match for now cuz numeric int/float mixing is handled explicitly at call sites
 bool TypeChecker::types_compatible(const TypeInfo& lhs, const TypeInfo& rhs) {
-    if (is_unknown(lhs) || is_unknown(rhs)) return true; // wildcard matches anything
+    if (is_unknown(lhs) || is_unknown(rhs)) return true;
 
-    // Void* is a generic pointer any pointer converts to/from it
     if (lhs.is_pointer && rhs.is_pointer) {
         if (lhs.base_type == TokenType::VoidKeyword || rhs.base_type == TokenType::VoidKeyword)
             return true;
@@ -39,6 +43,14 @@ bool TypeChecker::types_compatible(const TypeInfo& lhs, const TypeInfo& rhs) {
 
     if (lhs.is_array != rhs.is_array)     return false;
     if (lhs.is_pointer != rhs.is_pointer) return false;
+
+    // Recursively check array element types
+    if (lhs.is_array) {
+        if (lhs.inner_type && rhs.inner_type)
+            return types_compatible(*lhs.inner_type, *rhs.inner_type);
+        return true;
+    }
+
     if (lhs.base_type == TokenType::FloatKeyword && rhs.base_type == TokenType::IntKeyword) return true;
     if (lhs.base_type != rhs.base_type) return false;
     if (lhs.base_type == TokenType::Identifier) return lhs.struct_name == rhs.struct_name;
@@ -197,13 +209,9 @@ void TypeChecker::check_statement(ASTNode* node) {
 
     // x->y = z
     if (auto arrow_assign = dynamic_cast<ArrowAssignNode*>(node)) {
-        TypeInfo obj_type;
-        if (!find_variable(arrow_assign->left, obj_type)) {
-            errors.push_back("undefined variable: " + arrow_assign->left);
-            return;
-        }
+        TypeInfo obj_type = check_expression(arrow_assign->target.get());
         if (obj_type.base_type != TokenType::Identifier || obj_type.struct_name.empty()) {
-            errors.push_back(arrow_assign->left + " is not a struct");
+            errors.push_back("left side of '->' is not a struct");
             return;
         }
         auto sd = structs.find(obj_type.struct_name);
@@ -268,6 +276,43 @@ void TypeChecker::check_statement(ASTNode* node) {
     check_expression(node);
 }
 
+TypeInfo TypeChecker::check_cast(CastNode* node) {
+    TypeInfo source = check_expression(node->expression.get());
+    TypeInfo target = node->target_type;
+
+    // pointer-to-pointer allowed
+    if (source.is_pointer && target.is_pointer)
+        return target;
+
+    // pointer to non-pointer: error
+    if (source.is_pointer && !target.is_pointer) {
+        errors.push_back("cannot cast pointer to non-pointer type");
+        return unknown_type();
+    }
+
+    // arrays/structs can't be cast
+    if (source.is_array || target.is_array) {
+        errors.push_back("cannot cast array types");
+        return unknown_type();
+    }
+    if (source.base_type == TokenType::Identifier || target.base_type == TokenType::Identifier) {
+        // struct casts we reject for now
+        errors.push_back("cannot cast struct types");
+        return unknown_type();
+    }
+
+    // numeric/string/bool conversions allowed
+    if (is_numeric(source) || source.base_type == TokenType::StringKeyword ||
+        source.base_type == TokenType::BoolKeyword || source.base_type == TokenType::VoidKeyword) {
+        if (is_numeric(target) || target.base_type == TokenType::StringKeyword ||
+            target.base_type == TokenType::BoolKeyword) {
+            return target;
+        }
+    }
+
+    errors.push_back("invalid cast between these types");
+    return unknown_type();
+}
 
 TypeInfo TypeChecker::check_expression(ASTNode* node) {
     if (!node) return unknown_type();
@@ -277,6 +322,9 @@ TypeInfo TypeChecker::check_expression(ASTNode* node) {
         if (find_variable(lit->value, found)) return found; // it's a variable
         return default_type_for_literal(lit->value);         // it's an actual literal
     }
+
+    if (auto cast = dynamic_cast<CastNode*>(node))
+            return check_cast(cast);
 
     if (auto bin = dynamic_cast<BinOpNode*>(node)) {
         TypeInfo left_type  = check_expression(bin->left.get());
@@ -303,6 +351,8 @@ TypeInfo TypeChecker::check_expression(ASTNode* node) {
 
         if (bin->op == "==" || bin->op == "!=" || bin->op == "<" || bin->op == ">" ||
             bin->op == "<=" || bin->op == ">=") {
+            if (is_unknown(left_type) || is_unknown(right_type))
+                return TypeInfo(TokenType::BoolKeyword);  // add this line first
             if (is_numeric(left_type) && is_numeric(right_type)) return TypeInfo(TokenType::BoolKeyword);
             if (left_type.base_type == right_type.base_type)     return TypeInfo(TokenType::BoolKeyword);
             errors.push_back("operands of '" + bin->op + "' must be comparable (" +
@@ -341,23 +391,25 @@ TypeInfo TypeChecker::check_expression(ASTNode* node) {
                                   type_to_string(elem_type) + " vs " + type_to_string(t) + ")");
             }
         }
-        elem_type.is_array = true;
-        return elem_type;
+        TypeInfo arr_type;
+        arr_type.is_array = true;
+        arr_type.inner_type = std::make_shared<TypeInfo>(elem_type);
+        return arr_type;
     }
 
     if (auto idx = dynamic_cast<IndexAccessNode*>(node)) {
-        TypeInfo target_type;
-        if (!find_variable(idx->target, target_type)) {
-            errors.push_back("undefined variable: " + idx->target);
-            return unknown_type();
-        }
+        TypeInfo target_type = check_expression(idx->target.get());
+        
         if (!target_type.is_array) {
-            errors.push_back(idx->target + " is not an array");
+            errors.push_back("expression is not an array");
             return unknown_type();
         }
         TypeInfo index_type = check_expression(idx->index.get());
         if (index_type.base_type != TokenType::IntKeyword) {
             errors.push_back("array index must be Int, got " + type_to_string(index_type));
+        }
+        if (target_type.inner_type) {
+            return *target_type.inner_type;
         }
         TypeInfo elem_type = target_type;
         elem_type.is_array = false;
@@ -376,13 +428,9 @@ TypeInfo TypeChecker::check_expression(ASTNode* node) {
     }
 
     if (auto arw = dynamic_cast<ArrowNode*>(node)) {
-        TypeInfo obj_type;
-        if (!find_variable(arw->left, obj_type)) {
-            errors.push_back("undefined variable: " + arw->left);
-            return unknown_type();
-        }
+        TypeInfo obj_type = check_expression(arw->target.get());
         if (obj_type.base_type != TokenType::Identifier || obj_type.struct_name.empty()) {
-            errors.push_back(arw->left + " is not a struct");
+            errors.push_back("left side of '->' is not a struct");
             return unknown_type();
         }
         auto sd = structs.find(obj_type.struct_name);
@@ -403,7 +451,7 @@ TypeInfo TypeChecker::check_expression(ASTNode* node) {
         auto it = functions.find(call->name);
         if (it == functions.end()) {
             // if its unknown to the type checker then its probably a native/builtin
-            // Skip strict checking rather than falsepositiverroring on every builtin
+            // Skip strict checking rather than falsepositiveerroring on every builtin
             for (auto& arg : call->arguments) check_expression(arg.get());
             return unknown_type();
         }
@@ -423,6 +471,35 @@ TypeInfo TypeChecker::check_expression(ASTNode* node) {
             }
         }
         return fn->return_type;
+    }
+
+    // x[i] = expr
+    if (auto idx_assign = dynamic_cast<IndexAssignNode*>(node)) {
+        auto* idx_node = dynamic_cast<IndexAccessNode*>(idx_assign->target.get());
+        if (!idx_node) {
+            errors.push_back("invalid index assignment target");
+            return unknown_type();
+        }
+
+        TypeInfo target_type = check_expression(idx_node->target.get());
+        if (!target_type.is_array) {
+            errors.push_back("index assignment target is not an array");
+            return unknown_type();
+        }
+
+        TypeInfo index_type = check_expression(idx_node->index.get());
+        if (index_type.base_type != TokenType::IntKeyword && !is_unknown(index_type)) {
+            errors.push_back("array index must be Int, got " + type_to_string(index_type));
+        }
+
+        TypeInfo elem_type = target_type.inner_type ? *target_type.inner_type : unknown_type();
+        TypeInfo rhs = check_expression(idx_assign->expression.get());
+        if (!types_compatible(elem_type, rhs)) {
+            errors.push_back("cannot assign " + type_to_string(rhs) +
+                            " to array element of type " + type_to_string(elem_type));
+        }
+
+        return unknown_type();
     }
 
     errors.push_back("cannot type-check this expression");

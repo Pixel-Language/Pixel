@@ -52,7 +52,16 @@ private:
                              std::vector<std::unique_ptr<ASTNode>>& out);
 
     std::unique_ptr<ASTNode> parse_statement();
-    std::unique_ptr<ASTNode> parse_expression();
+
+    std::unique_ptr<ASTNode> parse_expression();   // entry point
+    std::unique_ptr<ASTNode> parse_or();
+    std::unique_ptr<ASTNode> parse_and();
+    std::unique_ptr<ASTNode> parse_equality();
+    std::unique_ptr<ASTNode> parse_comparison();
+    std::unique_ptr<ASTNode> parse_additive();
+    std::unique_ptr<ASTNode> parse_multiplicative();
+    std::unique_ptr<ASTNode> parse_unary();
+    std::unique_ptr<ASTNode> parse_primary();
 
     std::unique_ptr<ASTNode> parse_funccall(std::string name);
 

@@ -101,6 +101,7 @@ private:
     // expression visitors
     Value visit_literal(LiteralNode* node);
     Value visit_binop(BinOpNode* node);
+    Value visit_cast(CastNode* node);
     Value visit_assign(AssignNode* node);
     Value visit_call(FunctionCallNode* node);
     Value visit_grouping(GroupingNode* node);

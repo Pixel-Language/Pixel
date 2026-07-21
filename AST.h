@@ -35,8 +35,13 @@ struct ArrayLiteralNode : public ASTNode {
 
 // Array index access
 struct IndexAccessNode : public ASTNode {
-    std::string target;                // name of the array variable
+    std::unique_ptr<ASTNode> target;
     std::unique_ptr<ASTNode> index;    // the index expression
+};
+
+struct IndexAssignNode : public ASTNode {
+    std::unique_ptr<ASTNode> target;   // the full IndexAccessNode expr
+    std::unique_ptr<ASTNode> expression;
 };
 
 
@@ -108,14 +113,15 @@ struct StructDeclNode : public ASTNode {
     std::vector<std::unique_ptr<ASTNode>> contents;
 };
 
+
 struct ArrowNode : public ASTNode {
-    std::string left;
+    std::unique_ptr<ASTNode> target;
     std::string right;
 };
 
 // val_thing->x = <expression>
 struct ArrowAssignNode : public ASTNode {
-    std::string left;
+    std::unique_ptr<ASTNode> target;
     std::string right; 
     std::unique_ptr<ASTNode> expression;
 };
@@ -128,4 +134,9 @@ struct GroupingNode : public ASTNode {
 
 struct LoopControlNode : public ASTNode {
     std::string type;
+};
+
+struct CastNode : public ASTNode {
+    TypeInfo target_type;
+    std::unique_ptr<ASTNode> expression;
 };

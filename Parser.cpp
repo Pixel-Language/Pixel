@@ -62,7 +62,7 @@ std::string Parser::token_type_to_string(TokenType type) {
         case TokenType::String: return "String";
         case TokenType::True: return "True";
         case TokenType::False: return "False";
-        case TokenType::At: return "At";
+        case TokenType::Ampersand: return "Ampersand";
         case TokenType::EndOfFile: return "EOF";
         case TokenType::Rarrow: return "Rarrow";
         case TokenType::Equals: return "Equals";
@@ -245,11 +245,14 @@ std::unique_ptr<ASTNode> Parser::parse_funccall(std::string name) {
 }
 
 std::unique_ptr<ASTNode> Parser::parse_statement() {
+    // fn name(...) -> Type { ... }
+    if (current_token().type == TokenType::FuncDefine) {
+        return parse_function_definition();
+    }
 
-    if (current_token().type == TokenType::At) {
+    if (current_token().type == TokenType::Ampersand) {
         advance(); // consume '@'
-        auto target = parse_expression(); // the pointer expr
-        expect(TokenType::At);
+        auto target = parse_unary(); // the pointer expr
         expect(TokenType::Equals);
         auto deref_assign = std::make_unique<DerefAssignNode>();
         deref_assign->target = std::move(target);
@@ -269,11 +272,6 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         auto node = std::make_unique<LoopControlNode>();
         node->type = "continue";
         return node;
-    }
-
-    // fn name(...) -> Type { ... }
-    if (current_token().type == TokenType::FuncDefine) {
-        return parse_function_definition();
     }
 
     if (current_token().type == TokenType::Struct) {
@@ -370,63 +368,59 @@ std::unique_ptr<ASTNode> Parser::parse_statement() {
         return parse_declaration(type_info);
     }
 
- // Identifier it can do a lot of stuff
+    // Identifier it can do a lot of stuff
     if (current_token().type == TokenType::Identifier) {
-        // MyStruct var_name struct type followed by a variable name
+        // Struct variable declaration check: MyStruct var_name
         if (known_structs.count(current_token().value) &&
             pos + 1 < tokens.size() &&
             tokens[pos + 1].type == TokenType::Identifier) {
 
-            TypeInfo type_info = parse_type(); // consumes struct name
+            TypeInfo type_info = parse_type();
             return parse_declaration(type_info);
         }
 
-        std::string name = current_token().value;
-        advance();
+        // Parse expression vars structs and nested ones
+        auto expr = parse_primary();
 
-        // name(...) function call as a statement
-        if (current_token().type == TokenType::Lparen) {
-            return parse_funccall(name);
-        }
+        // Check for assignment (=)
+        if (current_token().type == TokenType::Equals) {
+            advance(); // consume '='
 
-        // name->field = expr  struct field assignment
-        if (current_token().type == TokenType::Rarrow) {
-            advance(); // consume '->'
-
-            if (current_token().type != TokenType::Identifier) {
-                error("expected field name after '->'");
-                return nullptr;
+            // simple var assign
+            if (auto lit = dynamic_cast<LiteralNode*>(expr.get())) {
+                std::string name = lit->value;
+                if (declared_vars.find(name) == declared_vars.end()) {
+                    error("variable '" + name + "' used before declaration");
+                }
+                auto assign = std::make_unique<AssignNode>();
+                assign->identifier     = name;
+                assign->is_declaration = false;
+                assign->expression     = parse_expression();
+                return assign;
             }
-            std::string field = current_token().value;
-            advance(); // consume field name
 
-            expect(TokenType::Equals);
+            // struct field assign
+            if (auto arrow = dynamic_cast<ArrowNode*>(expr.get())) {
+                auto arrow_assign = std::make_unique<ArrowAssignNode>();
+                arrow_assign->target     = std::move(arrow->target);
+                arrow_assign->right      = arrow->right;
+                arrow_assign->expression = parse_expression();
+                return arrow_assign;
+            }
 
-            auto arrow_assign = std::make_unique<ArrowAssignNode>();
-            arrow_assign->left       = name;
-            arrow_assign->right      = field;
-            arrow_assign->expression = parse_expression();
-            return arrow_assign;
+            if (auto idx = dynamic_cast<IndexAccessNode*>(expr.get())) {
+                auto idx_assign = std::make_unique<IndexAssignNode>();
+                idx_assign->target = std::move(expr);
+                idx_assign->expression = parse_expression();
+                return idx_assign;
+            }
+
+            error("invalid assignment target");
+            return nullptr;
         }
 
-        // name = expr reassignment (variable must already be declared)
-        expect(TokenType::Equals);
-
-        if (declared_vars.find(name) == declared_vars.end()) {
-            error("variable '" + name + "' used before declaration");
-            // create an assign node anyway to consume the expression
-            auto assign = std::make_unique<AssignNode>();
-            assign->identifier = name;
-            assign->is_declaration = false;
-            assign->expression = parse_expression();
-            return assign;
-        }
-
-        auto assign = std::make_unique<AssignNode>();
-        assign->identifier     = name;
-        assign->is_declaration = false;
-        assign->expression     = parse_expression();
-        return assign;
+        // Standalone expression or function call
+        return expr;
     }
 
     // Unknown token so skip it so we don't infinite-loop
@@ -443,20 +437,9 @@ TypeInfo Parser::parse_type() {
         advance(); // consume 'Array'
         expect(TokenType::Lbracket);
 
-        if (!is_type_keyword(current_token().type)) {
-            error("expected element type inside Array(...)");
-            // return a default type
-            info.base_type = TokenType::IntKeyword;
-            info.is_array = true;
-            // skip the bad token
-            advance();
-            expect(TokenType::Rparen);
-            return info;
-        }
-        info.base_type = current_token().type;
-        info.is_array  = true;
-
-        advance(); // consume element type
+        info.is_array = true;
+        
+        info.inner_type = std::make_shared<TypeInfo>(parse_type());
 
         expect(TokenType::Rbracket);
 
@@ -469,7 +452,6 @@ TypeInfo Parser::parse_type() {
         info.base_type = current_token().type;
         advance(); // consume type keyword
 
-        // Optional pointer modifier
         if (current_token().type == TokenType::Mult) {
             info.is_pointer = true;
             advance(); // consume '*'
@@ -480,10 +462,14 @@ TypeInfo Parser::parse_type() {
         info.base_type   = TokenType::Identifier;
         info.struct_name = current_token().value;
         advance(); // consume struct name
+        
+        if (current_token().type == TokenType::Mult) {
+            info.is_pointer = true;
+            advance(); // consume '*'
+        }
     }
     else {
         error("expected a type, got '" + current_token().value + "'");
-        // return a default type and skip the bad token
         info.base_type = TokenType::IntKeyword;
         advance();
     }
@@ -671,181 +657,218 @@ std::vector<Parameter> Parser::parse_parameters() {
 // parse_expression  returns a single expression node. true/false, sting literal, float, number, identifier, array, etc etc
 
 std::unique_ptr<ASTNode> Parser::parse_expression() {
-    std::unique_ptr<ASTNode> left;
+    return parse_or();
+}
 
-    bool is_unary_minus = false;
-    bool is_unary_not = false;
-    
+std::unique_ptr<ASTNode> Parser::parse_or() {
+    auto left = parse_and();
+    while (current_token().type == TokenType::Or) {
+        advance();
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = "or";
+        bin->left = std::move(left);
+        bin->right = parse_and();
+        left = std::move(bin);
+    }
+    return left;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_and() {
+    auto left = parse_equality();
+    while (current_token().type == TokenType::And) {
+        advance();
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = "and";
+        bin->left = std::move(left);
+        bin->right = parse_equality();
+        left = std::move(bin);
+    }
+    return left;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_equality() {
+    auto left = parse_comparison();
+    while (current_token().type == TokenType::DoubleEquals ||
+           current_token().type == TokenType::NotEquals) {
+        std::string op = current_token().value;
+        advance();
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = op;
+        bin->left = std::move(left);
+        bin->right = parse_comparison();
+        left = std::move(bin);
+    }
+    return left;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_comparison() {
+    auto left = parse_additive();
+    while (current_token().type == TokenType::GreaterThan ||
+           current_token().type == TokenType::LessThan ||
+           current_token().type == TokenType::GreaterThanEqualTo ||
+           current_token().type == TokenType::LessThanEqualTo) {
+        std::string op = current_token().value;
+        advance();
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = op;
+        bin->left = std::move(left);
+        bin->right = parse_additive();
+        left = std::move(bin);
+    }
+    return left;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_additive() {
+    auto left = parse_multiplicative();
+    while (current_token().type == TokenType::Plus ||
+           current_token().type == TokenType::Minus) {
+        std::string op = current_token().value;
+        advance();
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = op;
+        bin->left = std::move(left);
+        bin->right = parse_multiplicative();
+        left = std::move(bin);
+    }
+    return left;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_multiplicative() {
+    auto left = parse_unary();
+    while (current_token().type == TokenType::Mult ||
+           current_token().type == TokenType::Div) {
+        std::string op = current_token().value;
+        advance();
+        auto bin = std::make_unique<BinOpNode>();
+        bin->op = op;
+        bin->left = std::move(left);
+        bin->right = parse_unary();
+        left = std::move(bin);
+    }
+    return left;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_unary() {
+
     if (current_token().type == TokenType::Minus) {
-        is_unary_minus = true;
         advance(); // consume '-'
-    } else if (current_token().type == TokenType::ExclamationMark) {
-        is_unary_not = true;
-        advance(); // consume '!'
-    }
-
-    if (current_token().type == TokenType::Lparen) {
-        advance();
-        auto exp = parse_expression();
-        expect(TokenType::Rparen);
-        
-        // put in a grouping node because bracket
-        auto grouping = std::make_unique<GroupingNode>();
-        grouping->expression = std::move(exp);
-        left = std::move(grouping);
-    } else if (current_token().type == TokenType::True) {
-        auto lit = std::make_unique<LiteralNode>();
-        lit->value = "true";
-        advance();
-        left = std::move(lit);
-    }
-    else if (current_token().type == TokenType::False) {
-        auto lit = std::make_unique<LiteralNode>();
-        lit->value = "false";
-        advance();
-        left = std::move(lit);
-    } else if (current_token().type == TokenType::NullPtr) {
-        auto lit = std::make_unique<LiteralNode>();
-        lit->value = "nullptr";
-        advance();
-        left = std::move(lit);
-    } else if (current_token().type == TokenType::String) {
-        auto lit = std::make_unique<LiteralNode>();
-        lit->value = "\"" + current_token().value + "\"";
-        advance();
-        left = std::move(lit);
-    }
-    else if (current_token().type == TokenType::Float) {
-        auto lit = std::make_unique<LiteralNode>();
-        lit->value = current_token().value;
-        advance();
-        left = std::move(lit);
-    }
-    else if (current_token().type == TokenType::Number) {
-        auto lit = std::make_unique<LiteralNode>();
-        lit->value = current_token().value;
-        advance();
-        left = std::move(lit);
-    }
-    else if (current_token().type == TokenType::At) {
-        advance(); // consume '@'
-        auto target = parse_expression();
-        expect(TokenType::At);
-        auto deref = std::make_unique<DereferenceNode>();
-        deref->target = std::move(target);
-        left = std::move(deref);
-    }
-	else if (current_token().type == TokenType::Identifier || is_type_keyword(current_token().type)) {
-        std::string id = current_token().value;
-        advance();
-
-        if (current_token().type == TokenType::Lparen) {
-            // Function call expression: name(arg, arg, ...)
-            advance(); // consume '('
-            auto call = std::make_unique<FunctionCallNode>();
-            call->name = id;
-
-            while (current_token().type != TokenType::Rparen &&
-                   current_token().type != TokenType::EndOfFile) {
-                call->arguments.push_back(parse_expression());
-                if (current_token().type == TokenType::Comma) advance();
-            }
-            expect(TokenType::Rparen);
-            left = std::move(call);
-        } else if (current_token().type == TokenType::Rarrow) {
-            advance(); //consume arrow
-
-            auto arrow = std::make_unique<ArrowNode>();
-            arrow->left = id;
-            arrow->right = current_token().value;
-
-            advance(); //consume right value
-
-            left = std::move(arrow);
-        } else if (current_token().type == TokenType::Lbracket) {
-            // Array index access: name[index]
-            advance(); // consume '['
-            auto access = std::make_unique<IndexAccessNode>();
-            access->target = id;
-            access->index  = parse_expression();
-            expect(TokenType::Rbracket);
-            left = std::move(access);
-        }
-        else {
-            // Plain variable reference
-            auto lit = std::make_unique<LiteralNode>();
-            lit->value = id;
-            left = std::move(lit);
-        }
-    }
-    else if (current_token().type == TokenType::Lbracket) {
-        // Array literal: [elem, elem, ...]
-        advance(); // consume '['
-        auto array_lit = std::make_unique<ArrayLiteralNode>();
-
-        while (current_token().type != TokenType::Rbracket &&
-               current_token().type != TokenType::EndOfFile) {
-            array_lit->elements.push_back(parse_expression());
-            if (current_token().type == TokenType::Comma) advance();
-        }
-        expect(TokenType::Rbracket);
-        left = std::move(array_lit);
-    }
-    else {
-        // Unrecognised token - return an empty literal to avoid a null left
-        error("unexpected token in expression: '" + current_token().value + "'");
-        left = std::make_unique<LiteralNode>();
-        advance(); // skip the bad token
-    }
-
-    // unary ops
-    if (is_unary_minus) {
-        // Create 0,left
+        auto operand = parse_unary();
         auto zero = std::make_unique<LiteralNode>();
         zero->value = "0";
         auto bin = std::make_unique<BinOpNode>();
         bin->op = "-";
         bin->left = std::move(zero);
-        bin->right = std::move(left);
-        left = std::move(bin);
-    } else if (is_unary_not) {
+        bin->right = std::move(operand);
+        return bin;
+    }
+    if (current_token().type == TokenType::ExclamationMark) {
+        advance(); // consume '!'
+        auto operand = parse_unary();
         auto false_lit = std::make_unique<LiteralNode>();
         false_lit->value = "false";
         auto bin = std::make_unique<BinOpNode>();
         bin->op = "==";
-        bin->left = std::move(left);
+        bin->left = std::move(operand);
         bin->right = std::move(false_lit);
-        left = std::move(bin);
+        return bin;
+    }
+    return parse_primary();
+}
+
+std::unique_ptr<ASTNode> Parser::parse_primary() {
+    std::unique_ptr<ASTNode> left;
+
+    // base primary tokens
+    if (current_token().type == TokenType::Lparen) {
+        advance();
+        if (is_type_keyword(current_token().type)) {
+            auto cast_node = std::make_unique<CastNode>();
+            cast_node->target_type = parse_type();
+            expect(TokenType::Rparen);
+            cast_node->expression = parse_unary();
+            left = std::move(cast_node);
+        } else {
+            auto exp = parse_expression();
+            expect(TokenType::Rparen);
+            auto grouping = std::make_unique<GroupingNode>();
+            grouping->expression = std::move(exp);
+            left = std::move(grouping);
+        }
+    } else if (current_token().type == TokenType::True) {
+        auto lit = std::make_unique<LiteralNode>(); lit->value = "true"; advance(); left = std::move(lit);
+    } else if (current_token().type == TokenType::False) {
+        auto lit = std::make_unique<LiteralNode>(); lit->value = "false"; advance(); left = std::move(lit);
+    } else if (current_token().type == TokenType::NullPtr) {
+        auto lit = std::make_unique<LiteralNode>(); lit->value = "nullptr"; advance(); left = std::move(lit);
+    } else if (current_token().type == TokenType::String) {
+        auto lit = std::make_unique<LiteralNode>(); lit->value = "\"" + current_token().value + "\""; advance(); left = std::move(lit);
+    } else if (current_token().type == TokenType::Float || current_token().type == TokenType::Number) {
+        auto lit = std::make_unique<LiteralNode>(); lit->value = current_token().value; advance(); left = std::move(lit);
+    } else if (current_token().type == TokenType::Ampersand) {
+        advance();
+        auto target = parse_unary();
+        auto deref = std::make_unique<DereferenceNode>();
+        deref->target = std::move(target);
+        left = std::move(deref);
+    } else if (current_token().type == TokenType::Identifier || is_type_keyword(current_token().type)) {
+        std::string id = current_token().value;
+        advance();
+
+        if (current_token().type == TokenType::Lparen) {
+            advance();
+            auto call = std::make_unique<FunctionCallNode>();
+            call->name = id;
+            while (current_token().type != TokenType::Rparen && current_token().type != TokenType::EndOfFile) {
+                call->arguments.push_back(parse_expression());
+                if (current_token().type == TokenType::Comma) advance();
+            }
+            expect(TokenType::Rparen);
+            left = std::move(call);
+        } else {
+            auto lit = std::make_unique<LiteralNode>();
+            lit->value = id;
+            left = std::move(lit);
+        }
+    } else if (current_token().type == TokenType::Lbracket) {
+        advance(); // consume '['
+        auto arr = std::make_unique<ArrayLiteralNode>();
+        while (current_token().type != TokenType::Rbracket &&
+            current_token().type != TokenType::EndOfFile) {
+            arr->elements.push_back(parse_expression());
+            if (current_token().type == TokenType::Comma) advance();
+        }
+        expect(TokenType::Rbracket);
+        left = std::move(arr);
+    } else {
+        error("unexpected token in expression: '" + current_token().value + "'");
+        left = std::make_unique<LiteralNode>();
+        advance();
+        return left;
     }
 
-
-    // Binary operator: wrap left and right in a BinOpNode
-    if (current_token().type == TokenType::Plus        ||
-        current_token().type == TokenType::Minus       ||
-        current_token().type == TokenType::Mult        ||
-        current_token().type == TokenType::Div         ||
-        current_token().type == TokenType::GreaterThan ||
-        current_token().type == TokenType::LessThan    ||
-        current_token().type == TokenType::LessThanEqualTo    ||
-        current_token().type == TokenType::GreaterThanEqualTo    ||
-        current_token().type == TokenType::NotEquals   ||
-        current_token().type == TokenType::And         ||
-        current_token().type == TokenType::Or          ||
-        current_token().type == TokenType::DoubleEquals)
-    {
-        auto bin_op = std::make_unique<BinOpNode>();
-        bin_op->op    = current_token().value;
-
-        if (current_token().type == TokenType::And) {
-            bin_op->op = "and";
-        } else if (current_token().type == TokenType::Or) {
-            bin_op->op = "or";
+    // --- 2. Postfix Chaining Loop ---
+    while (true) {
+        if (current_token().type == TokenType::Rarrow) {
+            advance(); // consume '->'
+            if (current_token().type != TokenType::Identifier) {
+                error("expected field name after '->'");
+                break;
+            }
+            auto arrow = std::make_unique<ArrowNode>();
+            arrow->target = std::move(left);
+            arrow->right  = current_token().value;
+            advance(); // consume field name
+            left = std::move(arrow);
+        } else if (current_token().type == TokenType::Lbracket) {
+            advance();
+            auto access = std::make_unique<IndexAccessNode>();
+            access->target = std::move(left); // Store the AST node expression
+            access->index  = parse_expression();
+            expect(TokenType::Rbracket);
+            left = std::move(access);
+        } else {
+            break; // No more postfix operators
         }
-
-        bin_op->left  = std::move(left);
-        advance(); // consume operator
-        bin_op->right = parse_expression(); // right side parsed recursively
-        return bin_op;
     }
 
     return left;

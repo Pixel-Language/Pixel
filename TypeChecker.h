@@ -25,6 +25,8 @@ private:
     void push_scope() { scopes.emplace_back(); }
     void pop_scope()  { scopes.pop_back(); }
 
+    TypeInfo check_cast(CastNode* node);
+
     void declare(const std::string& name, const TypeInfo& t) {
         scopes.back()[name] = t;
     }

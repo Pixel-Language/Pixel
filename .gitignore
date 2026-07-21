@@ -7,3 +7,5 @@ output.c
 pixel_release
 pixel-release.zip
 history.md
+*.d
+*.o

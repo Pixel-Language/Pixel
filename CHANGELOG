@@ -50,3 +50,14 @@ Version 0.6.0 (2026-07-11):
 Version 0.6.1 (2026-07-17):
     added break and continue
     fixed "and" and "or"
+
+Version 0.7.0 (XXXX-XX-XX):
+    added a bunch more builtins
+    added type casting
+    made references to be more "proper"
+    operator prescedence
+    added indexassignnode
+    implemented nested arrays
+    implemented nested structs
+    implemented pointer arrays
+    made builtin funcs not error due to types not being known

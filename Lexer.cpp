@@ -195,7 +195,7 @@ std::vector<Token> Lexer::tokenize() {
             case '(': tokens.push_back(make_token(TokenType::Lparen, "(")); break;
             case ')': tokens.push_back(make_token(TokenType::Rparen, ")")); break;
             case '{': tokens.push_back(make_token(TokenType::Lbrace, "{")); break;
-            case '@': tokens.push_back(make_token(TokenType::At, "@")); break;
+            case '&': tokens.push_back(make_token(TokenType::Ampersand, "&")); break;
             case '}': tokens.push_back(make_token(TokenType::Rbrace, "}")); break;
             case '[': tokens.push_back(make_token(TokenType::Lbracket, "[")); break;
             case ']': tokens.push_back(make_token(TokenType::Rbracket, "]")); break;

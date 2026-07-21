@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <memory>
 
 struct SourceLocation {
     std::string filename;
@@ -55,7 +56,7 @@ enum class TokenType {
     Rarrow,
     Comma,
     Colon,
-    At,
+    Ampersand,
 
     // Keywords
     If,
@@ -89,6 +90,9 @@ struct TypeInfo {
     bool        is_array    = false;
     bool        is_pointer  = false;
     std::string struct_name = "";   // non-empty when base_type == Identifier
+    
+    // Points to the inner type for arrays and pointers
+    std::shared_ptr<TypeInfo> inner_type = nullptr; 
 
     TypeInfo() = default;
     TypeInfo(TokenType t) : base_type(t) {}
