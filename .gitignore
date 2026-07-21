@@ -5,6 +5,7 @@ pixel-vscode-extension
 test_doc.px
 output.c
 pixel_release
+pixel-release
 pixel-release.zip
 history.md
 *.d
