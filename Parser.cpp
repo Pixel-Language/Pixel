@@ -657,8 +657,36 @@ std::vector<Parameter> Parser::parse_parameters() {
 // parse_expression  returns a single expression node. true/false, sting literal, float, number, identifier, array, etc etc
 
 std::unique_ptr<ASTNode> Parser::parse_expression() {
+    // terary expressions
+    if (current_token().type == TokenType::Ternary) {
+        advance(); // consume 'ternary'
+        auto ter = std::make_unique<TernaryNode>();
+        ter->expression = parse_expression();
+        expect(TokenType::QuestionMark);
+        ter->exp1 = parse_expression();
+        expect(TokenType::Colon);
+        ter->exp2 = parse_expression();
+        return ter;
+    }
+
     return parse_or();
 }
+
+// std::unique_ptr<ASTNode> Parser::parse_ternary() {
+//     auto left = parse_or();
+//     while (current_token().type == TokenType::Ternary) {
+//         advance(); // consume 'ternary'
+//         auto ter = std::make_unique<TernaryNode>();
+//         ter->expression = parse_expression();
+//         expect(TokenType::QuestionMark);
+//         ter->exp1 = parse_expression();
+//         expect(TokenType::Colon);
+//         ter->exp2 = parse_expression();
+//         left = std::move(ter);
+//     } 
+//     return left;
+// }
+
 
 std::unique_ptr<ASTNode> Parser::parse_or() {
     auto left = parse_and();

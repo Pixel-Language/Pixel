@@ -154,6 +154,7 @@ Value Interpreter::visit(ASTNode* node) {
     if (!node) return Value::make_nil();
 
     if (auto lit = dynamic_cast<LiteralNode*>(node))       return visit_literal(lit);
+    if (auto trn = dynamic_cast<TernaryNode*>(node))       return visit_ternary(trn);
     if (auto bin = dynamic_cast<BinOpNode*>(node))         return visit_binop(bin);
     if (auto assign = dynamic_cast<AssignNode*>(node))     return visit_assign(assign);
     if (auto call = dynamic_cast<FunctionCallNode*>(node)) return visit_call(call);
@@ -166,6 +167,24 @@ Value Interpreter::visit(ASTNode* node) {
 
     error("cannot evaluate this expression type");
     return Value::make_nil();
+}
+
+Value Interpreter::visit_ternary(TernaryNode* node) {
+    Value cond = visit(node->expression.get());
+    
+    bool is_true = false;
+    if (cond.type == Value::TYPE_BOOL) {
+        is_true = cond.as_bool;
+    } else {
+        error("ternary condition must evaluate to a boolean");
+        return Value::make_nil();
+    }
+
+    if (is_true) {
+        return visit(node->exp1.get());
+    } else {
+        return visit(node->exp2.get());
+    }
 }
 
 Value Interpreter::visit_cast(CastNode* node) {

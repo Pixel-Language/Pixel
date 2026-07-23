@@ -397,6 +397,30 @@ TypeInfo TypeChecker::check_expression(ASTNode* node) {
         return arr_type;
     }
 
+if (auto ter = dynamic_cast<TernaryNode*>(node)) {
+        TypeInfo cond_type = check_expression(ter->expression.get());
+        if (cond_type.base_type != TokenType::BoolKeyword && !is_unknown(cond_type)) {
+            errors.push_back("ternary condition must be Bool, got " + type_to_string(cond_type));
+        }
+
+        TypeInfo true_type = check_expression(ter->exp1.get());
+        TypeInfo false_type = check_expression(ter->exp2.get());
+
+        if (!types_compatible(true_type, false_type)) {
+            errors.push_back("ternary branches have mismatched types (" + 
+                             type_to_string(true_type) + " vs " + type_to_string(false_type) + ")");
+            return unknown_type();
+        }
+
+        if (is_numeric(true_type) && is_numeric(false_type)) {
+            if (true_type.base_type == TokenType::FloatKeyword || false_type.base_type == TokenType::FloatKeyword) {
+                return TypeInfo(TokenType::FloatKeyword);
+            }
+        }
+
+        return true_type;
+    }
+
     if (auto idx = dynamic_cast<IndexAccessNode*>(node)) {
         TypeInfo target_type = check_expression(idx->target.get());
         

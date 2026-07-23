@@ -54,6 +54,7 @@ private:
     std::unique_ptr<ASTNode> parse_statement();
 
     std::unique_ptr<ASTNode> parse_expression();   // entry point
+    std::unique_ptr<ASTNode> parse_ternary();
     std::unique_ptr<ASTNode> parse_or();
     std::unique_ptr<ASTNode> parse_and();
     std::unique_ptr<ASTNode> parse_equality();

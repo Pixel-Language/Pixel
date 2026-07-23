@@ -140,3 +140,9 @@ struct CastNode : public ASTNode {
     TypeInfo target_type;
     std::unique_ptr<ASTNode> expression;
 };
+
+struct TernaryNode : public ASTNode {
+    std::unique_ptr<ASTNode> expression;
+    std::unique_ptr<ASTNode> exp1;
+    std::unique_ptr<ASTNode> exp2;
+};

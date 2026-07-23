@@ -104,6 +104,7 @@ private:
     Value visit_cast(CastNode* node);
     Value visit_assign(AssignNode* node);
     Value visit_call(FunctionCallNode* node);
+    Value visit_ternary(TernaryNode* node);
     Value visit_grouping(GroupingNode* node);
     Value visit_array_literal(ArrayLiteralNode* node);
     Value visit_index_access(IndexAccessNode* node);

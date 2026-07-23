@@ -51,6 +51,7 @@ enum class TokenType {
     Rparen,
     Lbrace,
     Rbrace,
+    QuestionMark,
     Lbracket,
     Rbracket,
     Rarrow,
@@ -71,6 +72,7 @@ enum class TokenType {
     Const,
     Break,
     Continue,
+    Ternary,
 
     // Directives
     Use,

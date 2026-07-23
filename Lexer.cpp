@@ -117,6 +117,7 @@ Token Lexer::parse_identifier() {
     if (result == "while")  { tok.type = TokenType::While; tok.value = result; return tok; }
     if (result == "elif")    { tok.type = TokenType::Elif; tok.value = result; return tok; }
     if (result == "break")    { tok.type = TokenType::Break; tok.value = result; return tok; }
+    if (result == "ternary")    { tok.type = TokenType::Ternary; tok.value = result; return tok; }
     if (result == "continue")    { tok.type = TokenType::Continue; tok.value = result; return tok; }
     if (result == "if")    { tok.type = TokenType::If; tok.value = result; return tok; }
     if (result == "else")    { tok.type = TokenType::Else; tok.value = result; return tok; }
@@ -199,6 +200,7 @@ std::vector<Token> Lexer::tokenize() {
             case '}': tokens.push_back(make_token(TokenType::Rbrace, "}")); break;
             case '[': tokens.push_back(make_token(TokenType::Lbracket, "[")); break;
             case ']': tokens.push_back(make_token(TokenType::Rbracket, "]")); break;
+            case '?': tokens.push_back(make_token(TokenType::QuestionMark, "?")); break;
 
             case '>':
                 if (index + 1 < src.length() && src[index + 1] == '=') {
